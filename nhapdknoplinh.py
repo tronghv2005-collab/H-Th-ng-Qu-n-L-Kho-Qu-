@@ -208,7 +208,7 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                     for real_idx, row in selected_rows.iterrows():
                         try:
                             raw_val = row['Ngày hiệu lực']
-                            dt_hieu_luc = pd.to_datetime(raw_val)
+                            dt_hieu_luc = pd.to_datetime(str(raw_val), errors='coerce')
                             ngay_hieu_luc = dt_hieu_luc.date()
                             ngay_hien_hanh = datetime.now().date()
                             
@@ -272,7 +272,7 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                     for real_idx, row in selected_rows_ht.iterrows():
                         try:
                             raw_val = row['Ngày hiệu lực']
-                            dt_hieu_luc = pd.to_datetime(raw_val)
+                            dt_hieu_luc = pd.to_datetime(str(raw_val), errors='coerce')
                             ngay_hieu_luc = dt_hieu_luc.date()
                             ngay_hien_hanh = datetime.now().date()
                             
@@ -326,8 +326,15 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
         rep_tiente = st.selectbox("Chọn Loại tiền tệ báo cáo", list_tiente)
 
         if st.button("⚡ Chạy Báo Cáo", type="primary"):
+            # Hàm an toàn tuyệt đối tránh lỗi pandas date parsing trên Python 3.14 cloud
             def safe_parse_date(val):
+                if pd.isna(val):
+                    return None
                 try:
+                    s = str(val).strip()
+                    # Cắt lấy 10 ký tự đầu tiên nếu là chuỗi dạng 'YYYY-MM-DD ...'
+                    if len(s) >= 10 and s[4] == '-' and s[7] == '-':
+                        return datetime.strptime(s[:10], '%Y-%m-%d').date()
                     dt = pd.to_datetime(val, errors='coerce')
                     if pd.notnull(dt):
                         return dt.date()
