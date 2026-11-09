@@ -557,7 +557,7 @@ elif report_type == "Báo Cáo Hoạt Động ATM (BC_atm)":
     """)
     
     PATH_NHATKY = os.path.join(SHARED_DATA_DIR, "BC_nhatkygiaodich.xlsx")
-    PATH_PARAM_ATM = os.path.join(BASE_DIR, "parameters", "ThamSo_ATM.xlsx")
+    PATH_PARAM_ATM = os.path.join(BASE_DIR, "parameters", "Thamso_atm.xlsx")
     
     thang_nam_str = start_curr.strftime("%m%Y")
     output_filename_atm = f"BC_atm_{thang_nam_str}.xlsx"
