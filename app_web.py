@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
-import numpy as np  # <--- ĐÃ BỔ SUNG KHAI BÁO NÀY ĐỂ HẾT LỖI
+import numpy as np
 from datetime import datetime, date
 import calendar
 import os
+import hashlib
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -55,7 +56,132 @@ try:
 except ImportError:
     kpi_module = None
 
-# Cấu hình giao diện Streamlit
+# ==================== ĐỊNH NGHĨA THƯ MỤC DÙNG CHUNG ====================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SHARED_DATA_DIR = os.path.join(BASE_DIR, "data_source")
+OUTPUT_DIR = os.path.join(BASE_DIR, "templates")
+
+os.makedirs(SHARED_DATA_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# ==================== HỆ THỐNG XÁC THỰC & BẢO MẬT ĐĂNG NHẬP ====================
+def hash_password(password):
+    """Hàm băm mật khẩu bằng SHA-256 để bảo mật tuyệt đối"""
+    return hashlib.sha256(str(password).encode('utf-8')).hexdigest()
+
+def check_login_system(base_dir):
+    param_dir = os.path.join(base_dir, "parameters")
+    path_canbo = os.path.join(param_dir, "Thamso_canbo.xlsx")
+    os.makedirs(param_dir, exist_ok=True)
+
+    # Khởi tạo file mẫu cán bộ nếu chưa có
+    if not os.path.exists(path_canbo):
+        try:
+            df_init_cb = pd.DataFrame([
+                {'MaNV': '12345', 'MatKhau': '00', 'TrangThai': True},
+                {'MaNV': '67890', 'MatKhau': '00', 'TrangThai': True}
+            ])
+            # Ép kiểu rõ ràng ngay từ đầu
+            df_init_cb['MaNV'] = df_init_cb['MaNV'].astype(str)
+            df_init_cb['MatKhau'] = df_init_cb['MatKhau'].astype(str)
+            df_init_cb.to_excel(path_canbo, index=False)
+        except:
+            pass
+
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
+    if 'current_user' not in st.session_state:
+        st.session_state.current_user = None
+    if 'force_change_pass' not in st.session_state:
+        st.session_state.force_change_pass = False
+
+    if not st.session_state.logged_in:
+        st.set_page_config(
+            page_title="Đăng Nhập - Hệ Thống Báo Cáo Trung Tâm",
+            page_icon="🔐",
+            layout="centered"
+        )
+        st.markdown("### 🔐 ĐĂNG NHẬP HỆ THỐNG TRUNG TÂM TIẾP QUỸ & NHNN")
+        with st.form("login_form_main"):
+            username = st.text_input("Mã cán bộ (Dãy số)")
+            password = st.text_input("Mật khẩu", type="password")
+            submit_login = st.form_submit_button("Đăng nhập", type="primary")
+
+            if submit_login:
+                try:
+                    df_cb = pd.read_excel(path_canbo, dtype={'MaNV': str, 'MatKhau': str})
+                    df_cb['MaNV'] = df_cb['MaNV'].str.strip()
+                    df_cb['MatKhau'] = df_cb['MatKhau'].str.strip()
+                    
+                    user_row = df_cb[df_cb['MaNV'] == username.strip()]
+                    
+                    if not user_row.empty:
+                        db_pass = user_row.iloc[0]['MatKhau']
+                        is_first_login = bool(user_row.iloc[0]['TrangThai'])
+                        
+                        input_check = password.strip() if is_first_login else hash_password(password.strip())
+                        
+                        if db_pass == input_check:
+                            st.session_state.current_user = f"Cán bộ {username.strip()}"
+                            st.session_state.logged_in = True
+                            st.session_state.force_change_pass = is_first_login
+                            st.rerun()
+                        else:
+                            st.error("❌ Mật khẩu không chính xác!")
+                    else:
+                        st.error("❌ Không tìm thấy mã cán bộ trong hệ thống!")
+                except Exception as e:
+                    st.error(f"❌ Lỗi đọc file danh sách cán bộ: {e}")
+        return False
+
+    # Bắt buộc đổi mật khẩu trong lần đầu đăng nhập (TrangThai == True)
+    if st.session_state.force_change_pass:
+        st.set_page_config(
+            page_title="Đổi Mật Khẩu Lần Đầu",
+            page_icon="⚠️",
+            layout="centered"
+        )
+        st.warning("⚠️ **Đăng nhập lần đầu: Vui lòng đổi mật khẩu mới để bảo mật tài khoản!** (Mật khẩu có thể ngắn gọn 1-2 ký tự)")
+        with st.form("change_pass_form_main"):
+            new_pass = st.text_input("Nhập mật khẩu mới", type="password", key="np1")
+            confirm_pass = st.text_input("Xác nhận lại mật khẩu mới", type="password", key="np2")
+            submit_change = st.form_submit_button("Lưu mật khẩu và Vào hệ thống", type="primary")
+
+            if submit_change:
+                if new_pass.strip() == "":
+                    st.warning("⚠️ Mật khẩu không được để trống!")
+                elif new_pass.strip() != confirm_pass.strip():
+                    st.warning("⚠️ Mật khẩu xác nhận không khớp!")
+                else:
+                    try:
+                        # Đọc file với dtype string để tránh lỗi định dạng số
+                        df_cb = pd.read_excel(path_canbo, dtype={'MaNV': str, 'MatKhau': str})
+                        df_cb['MaNV'] = df_cb['MaNV'].str.strip()
+                        df_cb['MatKhau'] = df_cb['MatKhau'].str.strip()
+                        
+                        target_ma = st.session_state.current_user.replace("Cán bộ ", "").strip()
+                        
+                        idx = df_cb[df_cb['MaNV'] == target_ma].index
+                        if not idx.empty:
+                            # Cập nhật giá trị chuỗi đã băm an toàn tuyệt đối
+                            df_cb.loc[idx, 'MatKhau'] = str(hash_password(new_pass.strip()))
+                            df_cb.loc[idx, 'TrangThai'] = False
+                            df_cb.to_excel(path_canbo, index=False)
+                            
+                            st.session_state.force_change_pass = False
+                            st.success("🎉 Đổi mật khẩu thành công!")
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Lỗi cập nhật mật khẩu: {e}")
+        return False
+
+    return True
+
+# --- THỰC THI KIỂM TRA ĐĂNG NHẬP TRƯỚC KHI HIỂN THỊ HỆ THỐNG ---
+if not check_login_system(BASE_DIR):
+    st.stop()
+
+# Cấu hình giao diện chính sau khi đăng nhập thành công
 st.set_page_config(
     page_title="Hệ Thống Báo Cáo Trung Tâm Tiếp Quỹ & NHNN",
     page_icon="📊",
@@ -120,6 +246,14 @@ default_kp_end = date(prev_month_year, prev_month, last_day_of_prev_month)
 
 
 # ==================== THANH ĐIỀU HƯỚNG (SIDEBAR) ====================
+st.sidebar.markdown(f"👤 **Tài khoản:** {st.session_state.current_user}")
+if st.sidebar.button("🚪 Đăng xuất", use_container_width=True):
+    st.session_state.logged_in = False
+    st.session_state.current_user = None
+    st.session_state.force_change_pass = False
+    st.rerun()
+
+st.sidebar.markdown("---")
 st.sidebar.header("⚙️ TÙY CHỌN CHỨC NĂNG")
 report_type = st.sidebar.selectbox(
     "Chọn loại báo cáo cần thực hiện:", 
@@ -129,7 +263,7 @@ report_type = st.sidebar.selectbox(
         "Báo Cáo Hoạt Động ATM (BC_atm)",
         "Giao Dịch Phát Sinh Lớn (Ds_Tiepquythugom)",
         "Báo Cáo XNK Theo Loại Tiền & Đối Tác",  
-        "Nhập Đăng Ký Nộp Lĩnh",  # <--- ĐÃ TÍCH HỢP MỚI TẠI ĐÂY
+        "Nhập Đăng Ký Nộp Lĩnh",  
         "Báo Cáo SLA Kho Quỹ",
         "Báo Cáo KPI Cán Bộ" 
     )
@@ -145,15 +279,6 @@ end_prev = st.sidebar.date_input("Đến ngày (Kỳ trước)", value=default_k
 st.sidebar.markdown("**2. Kỳ Báo Cáo (Hiện tại)**")
 start_curr = st.sidebar.date_input("Từ ngày (Kỳ này)", value=default_kc_start)
 end_curr = st.sidebar.date_input("Đến ngày (Kỳ này)", value=default_kc_end)
-
-
-# ==================== ĐỊNH NGHĨA THƯ MỤC DÙNG CHUNG ====================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SHARED_DATA_DIR = os.path.join(BASE_DIR, "data_source")
-OUTPUT_DIR = os.path.join(BASE_DIR, "templates")
-
-os.makedirs(SHARED_DATA_DIR, exist_ok=True)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 # ==================== HÀM RENDER DASHBOARD SLA TRỰC QUAN ====================

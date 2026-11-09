@@ -48,18 +48,20 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
             pass
     if not list_tiente: list_tiente = ["VND", "USD", "EUR", "JPY"]
 
-    # Khởi tạo file dữ liệu nếu chưa có
+    # Khởi tạo file dữ liệu nếu chưa có (Bổ sung sẵn 2 cột NguoiNhap và NguoiXL)
     if not os.path.exists(path_data_ds):
         try:
             df_init = pd.DataFrame(columns=[
                 'Cơ sở', 'Ngày lập', 'Ngày hiệu lực', 'Giờ Nộp Rút', 
-                'Tên khách hàng', 'Loại GD', 'Số tiền', 'Loại tiền', 'Trạng thái'
+                'Tên khách hàng', 'Loại GD', 'Số tiền', 'Loại tiền', 'Trạng thái',
+                'NguoiNhap', 'NguoiXL'
             ])
             df_init.to_excel(path_data_ds, index=False)
         except Exception as e:
             st.error(f"❌ Không thể tạo file dữ liệu: {e}")
 
     action = st.radio("Chọn chức năng:", ["Thêm mới giao dịch", "Xóa bản ghi (Chờ XL)", "Hoàn tất GD (Chờ XL)", "Báo cáo Đăng ký Nộp Lĩnh"], horizontal=True)
+    curr_user_name = st.session_state.get('current_user', 'System')
     st.markdown("---")
 
     # ---------------- 1. THÊM MỚI ----------------
@@ -71,7 +73,6 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
         if 'confirm_ghi' not in st.session_state:
             st.session_state.confirm_ghi = False
 
-        # Bỏ dùng st.form để người dùng dùng phím Tab/Enter tự nhiên không bị gượng ép
         col1, col2 = st.columns(2)
         with col1:
             t_coso = st.selectbox("1. Tên Cơ sở", list_coso, key="inp_coso")
@@ -139,7 +140,9 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                     'Loại GD': t_loai_gd,
                     'Số tiền': numeric_val,
                     'Loại tiền': t_loai_tien,
-                    'Trạng thái': 'Chờ XL'
+                    'Trạng thái': 'Chờ XL',
+                    'NguoiNhap': curr_user_name,
+                    'NguoiXL': ''
                 }
                 st.session_state.confirm_ghi = True
             except Exception as e:
@@ -155,6 +158,9 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                         new_row = st.session_state.form_data
                         if os.path.exists(path_data_ds):
                             df_current = pd.read_excel(path_data_ds)
+                            # Đảm bảo file cũ có đủ cột NguoiNhap, NguoiXL
+                            if 'NguoiNhap' not in df_current.columns: df_current['NguoiNhap'] = ''
+                            if 'NguoiXL' not in df_current.columns: df_current['NguoiXL'] = ''
                         else:
                             df_current = pd.DataFrame(columns=new_row.keys())
                             
@@ -179,6 +185,7 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
         st.markdown("#### 🗑️ Quản lý Xóa bản ghi (Tích chọn các dòng cần xóa bên dưới)")
         if not os.path.exists(path_data_ds): return
         df_all = pd.read_excel(path_data_ds)
+        if 'NguoiXL' not in df_all.columns: df_all['NguoiXL'] = ''
         
         df_cho = df_all[df_all['Trạng thái'] == 'Chờ XL'].copy()
         
@@ -231,6 +238,7 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                             
                             if du_dieu_kien_xoa:
                                 df_all.loc[real_idx, 'Trạng thái'] = 'Xóa'
+                                df_all.loc[real_idx, 'NguoiXL'] = curr_user_name
                                 success_count += 1
                             else:
                                 error_messages.append(f"Dòng {real_idx} quá hạn 3 tiếng.")
@@ -252,6 +260,7 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
         st.markdown("#### ✅ Hoàn tất Giao dịch (Tích chọn các dòng cần hoàn tất bên dưới)")
         if not os.path.exists(path_data_ds): return
         df_all = pd.read_excel(path_data_ds)
+        if 'NguoiXL' not in df_all.columns: df_all['NguoiXL'] = ''
         
         df_cho = df_all[df_all['Trạng thái'] == 'Chờ XL'].copy()
         
@@ -300,6 +309,7 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                                 gio_gioi_han = base_dt + timedelta(hours=3)
                                 if datetime.now() <= gio_gioi_han:
                                     df_all.loc[real_idx, 'Trạng thái'] = 'HT'
+                                    df_all.loc[real_idx, 'NguoiXL'] = curr_user_name
                                     success_count_ht += 1
                                 else:
                                     error_messages_ht.append(f"Dòng {real_idx}: Đã quá thời hạn 3 tiếng.")
@@ -325,6 +335,8 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
             
         try:
             df_rep = pd.read_excel(path_data_ds)
+            if 'NguoiNhap' not in df_rep.columns: df_rep['NguoiNhap'] = ''
+            if 'NguoiXL' not in df_rep.columns: df_rep['NguoiXL'] = ''
         except Exception as e:
             st.error(f"❌ Không thể đọc file dữ liệu: {e}")
             return
@@ -376,13 +388,15 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
             df_filtered = df_rep[mask].copy()
 
             if df_filtered.empty:
-                st.info(f"ℹ️ Không tìm thấy bản ghi nào trong khoảng từ {start_d.strftime('%d/%m/%Y')} đến {end_d.strftime('%d/%m/%Y')}. (Mẹo: Hãy thử mở rộng khoảng ngày vì trong file có thể có dữ liệu ở các ngày khác).")
+                st.info(f"ℹ️ Không tìm thấy bản ghi nào trong khoảng từ {start_d.strftime('%d/%m/%Y')} đến {end_d.strftime('%d/%m/%Y')}.")
             else:
                 df_filtered['Số tiền Nộp'] = df_filtered.apply(lambda r: r['Số tiền'] if str(r['Loại GD']).strip() == 'Nộp' else 0, axis=1)
                 df_filtered['Số tiền Lĩnh'] = df_filtered.apply(lambda r: r['Số tiền'] if str(r['Loại GD']).strip() == 'Lĩnh' else 0, axis=1)
 
                 table_out = pd.DataFrame({
                     'Cơ sở': df_filtered['Cơ sở'],
+                    'Người nhập (NguoiNhap)': df_filtered['NguoiNhap'],
+                    'Người xử lý (NguoiXL)': df_filtered['NguoiXL'],
                     'Ngày Đăng ký': df_filtered['Ngày lập'],
                     'Ngày hiệu lực': df_filtered['Ngày hiệu lực'],
                     'Giờ Nộp Rút': df_filtered['Giờ Nộp Rút'],
