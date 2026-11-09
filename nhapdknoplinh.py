@@ -3,8 +3,9 @@ import pandas as pd
 import os
 from datetime import datetime, date, timedelta
 
-def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
+def show_dang_ky_nop_linh_page(base_dir, shared_data_dir, current_user="System"):
     st.subheader("📝 QUẢN LÝ ĐĂNG KÝ NỘP LĨNH TIỀN MẶT")
+    st.markdown(f"👤 **Cán bộ thao tác hiện tại:** `{current_user}`")
     
     param_dir = os.path.join(base_dir, "parameters")
     path_thamso_coso = os.path.join(param_dir, "Thamso_coso.xlsx")
@@ -48,7 +49,7 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
             pass
     if not list_tiente: list_tiente = ["VND", "USD", "EUR", "JPY"]
 
-    # Khởi tạo file dữ liệu nếu chưa có (Bổ sung sẵn 2 cột NguoiNhap và NguoiXL)
+    # Khởi tạo file dữ liệu nếu chưa có
     if not os.path.exists(path_data_ds):
         try:
             df_init = pd.DataFrame(columns=[
@@ -61,7 +62,6 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
             st.error(f"❌ Không thể tạo file dữ liệu: {e}")
 
     action = st.radio("Chọn chức năng:", ["Thêm mới giao dịch", "Xóa bản ghi (Chờ XL)", "Hoàn tất GD (Chờ XL)", "Báo cáo Đăng ký Nộp Lĩnh"], horizontal=True)
-    curr_user_name = st.session_state.get('current_user', 'System')
     st.markdown("---")
 
     # ---------------- 1. THÊM MỚI ----------------
@@ -141,8 +141,8 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                     'Số tiền': numeric_val,
                     'Loại tiền': t_loai_tien,
                     'Trạng thái': 'Chờ XL',
-                    'NguoiNhap': curr_user_name,
-                    'NguoiXL': ''
+                    'NguoiNhap': str(current_user),
+                    'NguoiXL': str(current_user)  # Lúc chờ xử lý, Người xử lý ban đầu trùng với Người nhập
                 }
                 st.session_state.confirm_ghi = True
             except Exception as e:
@@ -157,17 +157,20 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                     try:
                         new_row = st.session_state.form_data
                         if os.path.exists(path_data_ds):
-                            df_current = pd.read_excel(path_data_ds)
-                            # Đảm bảo file cũ có đủ cột NguoiNhap, NguoiXL
+                            df_current = pd.read_excel(path_data_ds, dtype={'NguoiNhap': str, 'NguoiXL': str})
                             if 'NguoiNhap' not in df_current.columns: df_current['NguoiNhap'] = ''
                             if 'NguoiXL' not in df_current.columns: df_current['NguoiXL'] = ''
                         else:
                             df_current = pd.DataFrame(columns=new_row.keys())
                             
                         df_current = pd.concat([df_current, pd.DataFrame([new_row])], ignore_index=True)
+                        
+                        df_current['NguoiNhap'] = df_current['NguoiNhap'].fillna('').astype(str)
+                        df_current['NguoiXL'] = df_current['NguoiXL'].fillna('').astype(str)
+                        
                         df_current.to_excel(path_data_ds, index=False)
                         
-                        st.success(f"🎉 Ghi dữ liệu thành công! Trạng thái: [Chờ XL]")
+                        st.success(f"🎉 Ghi dữ liệu thành công bởi `{current_user}`! Trạng thái: [Chờ XL]")
                         st.session_state.confirm_ghi = False
                         st.session_state.form_data = None
                         st.rerun()
@@ -184,8 +187,13 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
     elif action == "Xóa bản ghi (Chờ XL)":
         st.markdown("#### 🗑️ Quản lý Xóa bản ghi (Tích chọn các dòng cần xóa bên dưới)")
         if not os.path.exists(path_data_ds): return
-        df_all = pd.read_excel(path_data_ds)
+        
+        df_all = pd.read_excel(path_data_ds, dtype={'NguoiNhap': str, 'NguoiXL': str})
         if 'NguoiXL' not in df_all.columns: df_all['NguoiXL'] = ''
+        if 'NguoiNhap' not in df_all.columns: df_all['NguoiNhap'] = ''
+        
+        df_all['NguoiXL'] = df_all['NguoiXL'].fillna('').astype(str)
+        df_all['NguoiNhap'] = df_all['NguoiNhap'].fillna('').astype(str)
         
         df_cho = df_all[df_all['Trạng thái'] == 'Chờ XL'].copy()
         
@@ -238,7 +246,7 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                             
                             if du_dieu_kien_xoa:
                                 df_all.loc[real_idx, 'Trạng thái'] = 'Xóa'
-                                df_all.loc[real_idx, 'NguoiXL'] = curr_user_name
+                                df_all.loc[real_idx, 'NguoiXL'] = str(current_user)  # Ghi nhận người thực hiện Xóa
                                 success_count += 1
                             else:
                                 error_messages.append(f"Dòng {real_idx} quá hạn 3 tiếng.")
@@ -246,8 +254,9 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                             error_messages.append(f"Dòng {real_idx} lỗi: {e}")
                     
                     if success_count > 0:
+                        df_all['NguoiXL'] = df_all['NguoiXL'].fillna('').astype(str)
                         df_all.to_excel(path_data_ds, index=False)
-                        st.success(f"✅ Đã xóa thành công {success_count} bản ghi!")
+                        st.success(f"✅ Đã xóa thành công {success_count} bản ghi bởi `{current_user}`!")
                     
                     for err in error_messages:
                         st.error(f"❌ {err}")
@@ -259,8 +268,13 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
     elif action == "Hoàn tất GD (Chờ XL)":
         st.markdown("#### ✅ Hoàn tất Giao dịch (Tích chọn các dòng cần hoàn tất bên dưới)")
         if not os.path.exists(path_data_ds): return
-        df_all = pd.read_excel(path_data_ds)
+        
+        df_all = pd.read_excel(path_data_ds, dtype={'NguoiNhap': str, 'NguoiXL': str})
         if 'NguoiXL' not in df_all.columns: df_all['NguoiXL'] = ''
+        if 'NguoiNhap' not in df_all.columns: df_all['NguoiNhap'] = ''
+        
+        df_all['NguoiXL'] = df_all['NguoiXL'].fillna('').astype(str)
+        df_all['NguoiNhap'] = df_all['NguoiNhap'].fillna('').astype(str)
         
         df_cho = df_all[df_all['Trạng thái'] == 'Chờ XL'].copy()
         
@@ -309,7 +323,7 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                                 gio_gioi_han = base_dt + timedelta(hours=3)
                                 if datetime.now() <= gio_gioi_han:
                                     df_all.loc[real_idx, 'Trạng thái'] = 'HT'
-                                    df_all.loc[real_idx, 'NguoiXL'] = curr_user_name
+                                    df_all.loc[real_idx, 'NguoiXL'] = str(current_user)  # Ghi nhận người thực hiện Hoàn tất
                                     success_count_ht += 1
                                 else:
                                     error_messages_ht.append(f"Dòng {real_idx}: Đã quá thời hạn 3 tiếng.")
@@ -317,8 +331,9 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                             error_messages_ht.append(f"Dòng {real_idx} lỗi: {e}")
                     
                     if success_count_ht > 0:
+                        df_all['NguoiXL'] = df_all['NguoiXL'].fillna('').astype(str)
                         df_all.to_excel(path_data_ds, index=False)
-                        st.success(f"✅ Đã hoàn tất thành công {success_count_ht} giao dịch!")
+                        st.success(f"✅ Đã hoàn tất thành công {success_count_ht} giao dịch bởi `{current_user}`!")
                     
                     for err in error_messages_ht:
                         st.error(f"❌ {err}")
@@ -334,9 +349,11 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
             return
             
         try:
-            df_rep = pd.read_excel(path_data_ds)
+            df_rep = pd.read_excel(path_data_ds, dtype={'NguoiNhap': str, 'NguoiXL': str})
             if 'NguoiNhap' not in df_rep.columns: df_rep['NguoiNhap'] = ''
             if 'NguoiXL' not in df_rep.columns: df_rep['NguoiXL'] = ''
+            df_rep['NguoiNhap'] = df_rep['NguoiNhap'].fillna('').astype(str)
+            df_rep['NguoiXL'] = df_rep['NguoiXL'].fillna('').astype(str)
         except Exception as e:
             st.error(f"❌ Không thể đọc file dữ liệu: {e}")
             return
@@ -393,10 +410,14 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                 df_filtered['Số tiền Nộp'] = df_filtered.apply(lambda r: r['Số tiền'] if str(r['Loại GD']).strip() == 'Nộp' else 0, axis=1)
                 df_filtered['Số tiền Lĩnh'] = df_filtered.apply(lambda r: r['Số tiền'] if str(r['Loại GD']).strip() == 'Lĩnh' else 0, axis=1)
 
+                # Kiểm tra an toàn cột NguoiNhap & NguoiXL luôn hiển thị đầy đủ
+                if 'NguoiNhap' not in df_filtered.columns: df_filtered['NguoiNhap'] = ''
+                if 'NguoiXL' not in df_filtered.columns: df_filtered['NguoiXL'] = ''
+
                 table_out = pd.DataFrame({
                     'Cơ sở': df_filtered['Cơ sở'],
-                    'Người nhập (NguoiNhap)': df_filtered['NguoiNhap'],
-                    'Người xử lý (NguoiXL)': df_filtered['NguoiXL'],
+                    'Người nhập (NguoiNhap)': df_filtered['NguoiNhap'].fillna('').astype(str),
+                    'Người xử lý (NguoiXL)': df_filtered['NguoiXL'].fillna('').astype(str),
                     'Ngày Đăng ký': df_filtered['Ngày lập'],
                     'Ngày hiệu lực': df_filtered['Ngày hiệu lực'],
                     'Giờ Nộp Rút': df_filtered['Giờ Nộp Rút'],

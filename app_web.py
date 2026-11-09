@@ -711,7 +711,7 @@ elif report_type == "Nhập Đăng Ký Nộp Lĩnh":
     if nhapdknoplinh is None:
         st.error("❌ Không tìm thấy module `nhapdknoplinh.py`. Vui lòng kiểm tra lại file code.")
     else:
-        nhapdknoplinh.show_dang_ky_nop_linh_page(BASE_DIR, SHARED_DATA_DIR)
+        nhapdknoplinh.show_dang_ky_nop_linh_page(BASE_DIR, SHARED_DATA_DIR, st.session_state.get('current_user', 'System'))
 
 
 elif report_type == "Báo Cáo SLA Kho Quỹ":
