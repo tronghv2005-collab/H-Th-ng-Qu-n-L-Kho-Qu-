@@ -81,7 +81,6 @@ def check_login_system(base_dir):
                 {'MaNV': '12345', 'MatKhau': '00', 'TrangThai': True},
                 {'MaNV': '67890', 'MatKhau': '00', 'TrangThai': True}
             ])
-            # Ép kiểu rõ ràng ngay từ đầu
             df_init_cb['MaNV'] = df_init_cb['MaNV'].astype(str)
             df_init_cb['MatKhau'] = df_init_cb['MatKhau'].astype(str)
             df_init_cb.to_excel(path_canbo, index=False)
@@ -102,6 +101,8 @@ def check_login_system(base_dir):
             layout="centered"
         )
         st.markdown("### 🔐 ĐĂNG NHẬP HỆ THỐNG TRUNG TÂM TIẾP QUỸ & NHNN")
+        
+        # Sử dụng st.form chuẩn để trình duyệt/iOS nhận diện form đăng nhập và kích hoạt tính năng lưu mật khẩu
         with st.form("login_form_main"):
             username = st.text_input("Mã cán bộ (Dãy số)")
             password = st.text_input("Mật khẩu", type="password")
@@ -141,7 +142,8 @@ def check_login_system(base_dir):
             page_icon="⚠️",
             layout="centered"
         )
-        st.warning("⚠️ **Đăng nhập lần đầu: Vui lòng đổi mật khẩu mới để bảo mật tài khoản!** (Mật khẩu có thể ngắn gọn 1-2 ký tự)")
+        st.warning("⚠️ **Đăng nhập lần đầu: Vui lòng đổi mật khẩu mới để bảo mật tài khoản!**")
+        
         with st.form("change_pass_form_main"):
             new_pass = st.text_input("Nhập mật khẩu mới", type="password", key="np1")
             confirm_pass = st.text_input("Xác nhận lại mật khẩu mới", type="password", key="np2")
@@ -154,7 +156,6 @@ def check_login_system(base_dir):
                     st.warning("⚠️ Mật khẩu xác nhận không khớp!")
                 else:
                     try:
-                        # Đọc file với dtype string để tránh lỗi định dạng số
                         df_cb = pd.read_excel(path_canbo, dtype={'MaNV': str, 'MatKhau': str})
                         df_cb['MaNV'] = df_cb['MaNV'].str.strip()
                         df_cb['MatKhau'] = df_cb['MatKhau'].str.strip()
@@ -163,7 +164,6 @@ def check_login_system(base_dir):
                         
                         idx = df_cb[df_cb['MaNV'] == target_ma].index
                         if not idx.empty:
-                            # Cập nhật giá trị chuỗi đã băm an toàn tuyệt đối
                             df_cb.loc[idx, 'MatKhau'] = str(hash_password(new_pass.strip()))
                             df_cb.loc[idx, 'TrangThai'] = False
                             df_cb.to_excel(path_canbo, index=False)
@@ -399,7 +399,7 @@ if report_type == "Báo Cáo Tổng Hợp (Tiếp Quỹ & Thu Gom)":
     
     PATH_FILE1 = os.path.join(SHARED_DATA_DIR, "Ds_Tiepquythugom.xlsx")
     PATH_FILE2 = os.path.join(SHARED_DATA_DIR, "Ds_Noplinhkhac.xlsx")
-    PATH_PARAM_KM = os.path.join(BASE_DIR, "parameters", "ThamSo_KM.xlsx")
+    PATH_PARAM_KM = os.path.join(BASE_DIR, "parameters", "Thamso_KM.xlsx")
     PATH_TEMPLATE = os.path.join(BASE_DIR, "templates", "Template_BaoCao1.xlsx")
 
     if st.button("⚡ Chạy và Xem Báo Cáo Tổng Hợp", type="primary"):
