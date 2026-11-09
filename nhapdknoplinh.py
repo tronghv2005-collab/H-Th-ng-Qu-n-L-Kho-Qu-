@@ -71,86 +71,86 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
         if 'confirm_ghi' not in st.session_state:
             st.session_state.confirm_ghi = False
 
-        with st.form("form_them_moi"):
-            col1, col2 = st.columns(2)
-            with col1:
-                t_coso = st.selectbox("1. Tên Cơ sở", list_coso)
-                t_ngay_dk = date.today()
-                st.text(f"2. Ngày Đăng ký: {t_ngay_dk.strftime('%d/%m/%Y')}")
-                
-                t_ngay_hl = st.date_input("3. Ngày hiệu lực", value=date.today())
-                
-                t_gio_nop_rut_str = st.text_input("4. Giờ Nộp / Rút (Gõ liền số, vd: 930 hoặc 1430)", value="", key="input_gio_moi", placeholder="Ví dụ: 930")
-                
-                raw_g = ''.join([c for c in t_gio_nop_rut_str if c.isdigit()])
-                if len(raw_g) == 3:
-                    formatted_gio = f"0{raw_g[0]}:{raw_g[1:]}:00"
-                elif len(raw_g) == 4:
-                    formatted_gio = f"{raw_g[:2]}:{raw_g[2:]}:00"
-                elif len(raw_g) >= 6:
-                    formatted_gio = f"{raw_g[:2]}:{raw_g[2:4]}:{raw_g[4:6]}"
-                else:
-                    formatted_gio = t_gio_nop_rut_str.strip() if t_gio_nop_rut_str.strip() else "08:30:00"
-                
-                st.caption(f"💡 Giờ nhận diện tự động: **{formatted_gio}**")
-                
-                st.markdown("---")
-                st.markdown("**5. Chọn Tên CN/PGD:**")
-                search_box = st.text_input("🔍 Gõ từ khóa lọc nhanh PGD:", "", key="pgd_search_input")
-                
-                filtered_kh = [kh for kh in list_kh if search_box.lower() in kh.lower()] if search_box.strip() else list_kh
-                if not filtered_kh: filtered_kh = ["Không tìm thấy kết quả phù hợp"]
-                
-                t_kh = st.selectbox(f"Kết quả lọc ({len(filtered_kh)} PGD):", filtered_kh, label_visibility="collapsed")
-                st.markdown("---")
-                
-            with col2:
-                t_loai_gd = st.selectbox("6. Loại giao dịch", ["Nộp", "Lĩnh"])
-                t_loai_tien = st.selectbox("7. Loại tiền", list_tiente)
-                
-                raw_sotien_input = st.text_input("8. Số tiền", value="0", key="input_tien_moi")
-                
-                try:
-                    clean_chars = ''.join([c for c in raw_sotien_input if c.isdigit()])
-                    numeric_val = float(clean_chars) if clean_chars else 0.0
-                    formatted_display = f"{numeric_val:,.0f}"
-                except:
-                    numeric_val = 0.0
-                    formatted_display = "0"
-                
-                st.markdown(f"💡 **Số tiền hiển thị chính xác:** <span style='color: #D4849D; font-size: 1.2em; font-weight: bold;'>{formatted_display}</span>", unsafe_allow_html=True)
-                
-            submitted = st.form_submit_button("💾 Ghi dữ liệu")
+        # Bỏ dùng st.form để người dùng dùng phím Tab/Enter tự nhiên không bị gượng ép
+        col1, col2 = st.columns(2)
+        with col1:
+            t_coso = st.selectbox("1. Tên Cơ sở", list_coso, key="inp_coso")
+            t_ngay_dk = date.today()
+            st.text(f"2. Ngày Đăng ký: {t_ngay_dk.strftime('%d/%m/%Y')}")
             
-            if submitted:
-                try:
-                    gio_str = formatted_gio
-                    if len(gio_str.split(':')) == 2:
-                        gio_str = gio_str + ":00"
-                    
-                    ngay_gio_hl_str = f"{t_ngay_hl.strftime('%Y-%m-%d')} {gio_str}"
-                    
-                    st.session_state.form_data = {
-                        'Cơ sở': t_coso,
-                        'Ngày lập': t_ngay_dk.strftime('%Y-%m-%d'),
-                        'Ngày hiệu lực': ngay_gio_hl_str,
-                        'Giờ Nộp Rút': gio_str,
-                        'Tên khách hàng': t_kh,
-                        'Loại GD': t_loai_gd,
-                        'Số tiền': numeric_val,
-                        'Loại tiền': t_loai_tien,
-                        'Trạng thái': 'Chờ XL'
-                    }
-                    st.session_state.confirm_ghi = True
-                except Exception as e:
-                    st.error(f"❌ Lỗi dữ liệu hoặc định dạng giờ: {e}")
+            t_ngay_hl = st.date_input("3. Ngày hiệu lực", value=date.today(), key="inp_ngay_hl")
+            
+            t_gio_nop_rut_str = st.text_input("4. Giờ Nộp / Rút (Gõ liền số, vd: 930 hoặc 1430)", value="", key="inp_gio", placeholder="Ví dụ: 930")
+            
+            raw_g = ''.join([c for c in t_gio_nop_rut_str if c.isdigit()])
+            if len(raw_g) == 3:
+                formatted_gio = f"0{raw_g[0]}:{raw_g[1:]}:00"
+                h, m, s = 0, int(raw_g[0]), int(raw_g[1:])
+            elif len(raw_g) == 4:
+                formatted_gio = f"{raw_g[:2]}:{raw_g[2:]}:00"
+                h, m, s = int(raw_g[:2]), int(raw_g[2:4]), 0
+            elif len(raw_g) >= 6:
+                formatted_gio = f"{raw_g[:2]}:{raw_g[2:4]}:{raw_g[4:6]}"
+                h, m, s = int(raw_g[:2]), int(raw_g[2:4]), int(raw_g[4:6])
+            else:
+                formatted_gio = "08:30:00"
+                h, m, s = 8, 30, 0
+            
+            st.caption(f"💡 Giờ nhận diện tự động: **{formatted_gio}**")
+            
+            st.markdown("---")
+            st.markdown("**5. Chọn Tên CN/PGD:**")
+            search_box = st.text_input("🔍 Gõ từ khóa lọc nhanh PGD:", "", key="pgd_search_input")
+            
+            filtered_kh = [kh for kh in list_kh if search_box.lower() in kh.lower()] if search_box.strip() else list_kh
+            if not filtered_kh: filtered_kh = ["Không tìm thấy kết quả phù hợp"]
+            
+            t_kh = st.selectbox(f"Kết quả lọc ({len(filtered_kh)} PGD):", filtered_kh, label_visibility="collapsed", key="inp_kh")
+            st.markdown("---")
+            
+        with col2:
+            t_loai_gd = st.selectbox("6. Loại giao dịch", ["Nộp", "Lĩnh"], key="inp_loai_gd")
+            t_loai_tien = st.selectbox("7. Loại tiền", list_tiente, key="inp_tiente")
+            
+            raw_sotien_input = st.text_input("8. Số tiền", value="0", key="inp_sotien")
+            
+            try:
+                clean_chars = ''.join([c for c in raw_sotien_input if c.isdigit()])
+                numeric_val = float(clean_chars) if clean_chars else 0.0
+                formatted_display = f"{numeric_val:,.0f}"
+            except:
+                numeric_val = 0.0
+                formatted_display = "0"
+            
+            st.markdown(f"💡 **Số tiền hiển thị chính xác:** <span style='color: #D4849D; font-size: 1.2em; font-weight: bold;'>{formatted_display}</span>", unsafe_allow_html=True)
+            
+        submitted = st.button("💾 Ghi dữ liệu", type="primary", use_container_width=True)
+        
+        if submitted:
+            try:
+                ngay_gio_hl_dt = datetime.combine(t_ngay_hl, datetime.min.time().replace(hour=h, minute=m, second=s))
+                
+                st.session_state.form_data = {
+                    'Cơ sở': t_coso,
+                    'Ngày lập': t_ngay_dk.strftime('%Y-%m-%d'),
+                    'Ngày hiệu lực': ngay_gio_hl_dt,
+                    'Giờ Nộp Rút': formatted_gio,
+                    'Tên khách hàng': t_kh,
+                    'Loại GD': t_loai_gd,
+                    'Số tiền': numeric_val,
+                    'Loại tiền': t_loai_tien,
+                    'Trạng thái': 'Chờ XL'
+                }
+                st.session_state.confirm_ghi = True
+            except Exception as e:
+                st.error(f"❌ Lỗi dữ liệu hoặc định dạng giờ: {e}")
 
         if st.session_state.get('confirm_ghi', False) and st.session_state.get('form_data') is not None:
             st.warning("⚠️ **Bạn có chắc chắn muốn ghi bản ghi đăng ký nộp lĩnh này vào hệ thống không?**")
             
             c_yes, c_no = st.columns(2)
             with c_yes:
-                if st.button("✅ Yes (Đồng ý ghi)", use_container_width=True):
+                if st.button("✅ Yes (Đồng ý ghi)", use_container_width=True, key="btn_yes_ghi"):
                     try:
                         new_row = st.session_state.form_data
                         if os.path.exists(path_data_ds):
@@ -168,7 +168,7 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                     except Exception as e:
                         st.error(f"❌ Lỗi khi ghi file: {e}")
             with c_no:
-                if st.button("❌ No (Hủy bỏ)", use_container_width=True):
+                if st.button("❌ No (Hủy bỏ)", use_container_width=True, key="btn_no_ghi"):
                     st.info("ℹ️ Đã hủy thao tác ghi dữ liệu.")
                     st.session_state.confirm_ghi = False
                     st.session_state.form_data = None
@@ -208,7 +208,15 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                     for real_idx, row in selected_rows.iterrows():
                         try:
                             raw_val = row['Ngày hiệu lực']
-                            dt_hieu_luc = pd.to_datetime(str(raw_val), errors='coerce')
+                            if isinstance(raw_val, datetime):
+                                dt_hieu_luc = raw_val
+                            else:
+                                s_val = str(raw_val).strip()
+                                if len(s_val) >= 10 and s_val[4] == '-' and s_val[7] == '-':
+                                    dt_hieu_luc = datetime.strptime(s_val[:10], '%Y-%m-%d')
+                                else:
+                                    dt_hieu_luc = datetime.now()
+                            
                             ngay_hieu_luc = dt_hieu_luc.date()
                             ngay_hien_hanh = datetime.now().date()
                             
@@ -216,7 +224,8 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                             if ngay_hieu_luc > ngay_hien_hanh:
                                 du_dieu_kien_xoa = True
                             elif ngay_hieu_luc == ngay_hien_hanh:
-                                gio_gioi_han = dt_hieu_luc.to_pydatetime() + timedelta(hours=3)
+                                base_dt = dt_hieu_luc if isinstance(dt_hieu_luc, datetime) else datetime.combine(ngay_hieu_luc, datetime.min.time())
+                                gio_gioi_han = base_dt + timedelta(hours=3)
                                 if datetime.now() <= gio_gioi_han:
                                     du_dieu_kien_xoa = True
                             
@@ -272,14 +281,23 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                     for real_idx, row in selected_rows_ht.iterrows():
                         try:
                             raw_val = row['Ngày hiệu lực']
-                            dt_hieu_luc = pd.to_datetime(str(raw_val), errors='coerce')
+                            if isinstance(raw_val, datetime):
+                                dt_hieu_luc = raw_val
+                            else:
+                                s_val = str(raw_val).strip()
+                                if len(s_val) >= 10 and s_val[4] == '-' and s_val[7] == '-':
+                                    dt_hieu_luc = datetime.strptime(s_val[:10], '%Y-%m-%d')
+                                else:
+                                    dt_hieu_luc = datetime.now()
+                                    
                             ngay_hieu_luc = dt_hieu_luc.date()
                             ngay_hien_hanh = datetime.now().date()
                             
                             if ngay_hieu_luc != ngay_hien_hanh:
                                 error_messages_ht.append(f"Dòng {real_idx}: Ngày hiệu lực không phải ngày hôm nay.")
                             else:
-                                gio_gioi_han = dt_hieu_luc.to_pydatetime() + timedelta(hours=3)
+                                base_dt = dt_hieu_luc if isinstance(dt_hieu_luc, datetime) else datetime.combine(ngay_hieu_luc, datetime.min.time())
+                                gio_gioi_han = base_dt + timedelta(hours=3)
                                 if datetime.now() <= gio_gioi_han:
                                     df_all.loc[real_idx, 'Trạng thái'] = 'HT'
                                     success_count_ht += 1
@@ -316,28 +334,25 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
             return
 
         col_f1, col_f2, col_f3, col_f4 = st.columns(4)
-        with col_f1: rep_start = st.date_input("Từ ngày hiệu lực", value=date.today())
-        with col_f2: rep_end = st.date_input("Đến ngày hiệu lực", value=date.today())
-        with col_f3: rep_coso = st.selectbox("Chọn Cơ sở", ["All"] + list_coso)
+        with col_f1: rep_start = st.date_input("Từ ngày hiệu lực", value=date.today(), key="rep_start_date")
+        with col_f2: rep_end = st.date_input("Đến ngày hiệu lực", value=date.today(), key="rep_end_date")
+        with col_f3: rep_coso = st.selectbox("Chọn Cơ sở", ["All"] + list_coso, key="rep_sel_coso")
         
         available_tt = df_rep['Trạng thái'].dropna().astype(str).unique().tolist() if 'Trạng thái' in df_rep.columns else ["Chờ XL", "HT"]
-        with col_f4: rep_tt = st.multiselect("Chọn Trạng thái", available_tt, default=available_tt)
+        with col_f4: rep_tt = st.multiselect("Chọn Trạng thái", available_tt, default=available_tt, key="rep_sel_tt")
 
-        rep_tiente = st.selectbox("Chọn Loại tiền tệ báo cáo", list_tiente)
+        rep_tiente = st.selectbox("Chọn Loại tiền tệ báo cáo", list_tiente, key="rep_sel_tiente")
 
-        if st.button("⚡ Chạy Báo Cáo", type="primary"):
-            # Hàm an toàn tuyệt đối tránh lỗi pandas date parsing trên Python 3.14 cloud
+        if st.button("⚡ Chạy Báo Cáo", type="primary", key="btn_chay_bc"):
             def safe_parse_date(val):
                 if pd.isna(val):
                     return None
+                if isinstance(val, datetime):
+                    return val.date()
                 try:
                     s = str(val).strip()
-                    # Cắt lấy 10 ký tự đầu tiên nếu là chuỗi dạng 'YYYY-MM-DD ...'
                     if len(s) >= 10 and s[4] == '-' and s[7] == '-':
                         return datetime.strptime(s[:10], '%Y-%m-%d').date()
-                    dt = pd.to_datetime(val, errors='coerce')
-                    if pd.notnull(dt):
-                        return dt.date()
                 except:
                     pass
                 return None
