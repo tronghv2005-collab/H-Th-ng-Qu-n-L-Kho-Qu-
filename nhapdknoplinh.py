@@ -80,7 +80,6 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                 
                 t_ngay_hl = st.date_input("3. Ngày hiệu lực", value=date.today())
                 
-                # Ô nhập giờ nộp rút (Gõ liền số, vd: 930 -> 09:30:00)
                 t_gio_nop_rut_str = st.text_input("4. Giờ Nộp / Rút (Gõ liền số, vd: 930 hoặc 1430)", value="", key="input_gio_moi", placeholder="Ví dụ: 930")
                 
                 raw_g = ''.join([c for c in t_gio_nop_rut_str if c.isdigit()])
@@ -95,7 +94,6 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                 
                 st.caption(f"💡 Giờ nhận diện tự động: **{formatted_gio}**")
                 
-                # Bộ lọc tìm kiếm nhanh PGD
                 st.markdown("---")
                 st.markdown("**5. Chọn Tên CN/PGD:**")
                 search_box = st.text_input("🔍 Gõ từ khóa lọc nhanh PGD:", "", key="pgd_search_input")
@@ -110,7 +108,6 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                 t_loai_gd = st.selectbox("6. Loại giao dịch", ["Nộp", "Lĩnh"])
                 t_loai_tien = st.selectbox("7. Loại tiền", list_tiente)
                 
-                # Ô nhập số tiền trực quan ngay lập tức
                 raw_sotien_input = st.text_input("8. Số tiền", value="0", key="input_tien_moi")
                 
                 try:
@@ -148,7 +145,6 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                 except Exception as e:
                     st.error(f"❌ Lỗi dữ liệu hoặc định dạng giờ: {e}")
 
-        # HỘP THOẠI XÁC NHẬN (YES / NO) KHI BẤM NÚT GHI
         if st.session_state.get('confirm_ghi', False) and st.session_state.get('form_data') is not None:
             st.warning("⚠️ **Bạn có chắc chắn muốn ghi bản ghi đăng ký nộp lĩnh này vào hệ thống không?**")
             
@@ -184,16 +180,13 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
         if not os.path.exists(path_data_ds): return
         df_all = pd.read_excel(path_data_ds)
         
-        # Lọc các dòng đang Chờ XL
         df_cho = df_all[df_all['Trạng thái'] == 'Chờ XL'].copy()
         
         if df_cho.empty:
             st.info("ℹ️ Không có bản ghi nào đang ở trạng thái 'Chờ XL'.")
         else:
-            # Thêm cột checkbox (Chọn) vào bảng giao diện
             df_cho.insert(0, 'Chọn', False)
             
-            # Sử dụng st.data_editor để người dùng tích chọn trực tiếp trên bảng
             edited_df = st.data_editor(
                 df_cho,
                 column_config={'Chọn': st.column_config.CheckboxColumn("Tích chọn", required=True)},
@@ -204,7 +197,6 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
             )
             
             if st.button("⚠️ Xác nhận Xóa các dòng đã tích chọn", type="primary"):
-                # Lấy danh sách các dòng được tích chọn (True)
                 selected_rows = edited_df[edited_df['Chọn'] == True]
                 
                 if selected_rows.empty:
@@ -222,10 +214,8 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                             
                             du_dieu_kien_xoa = False
                             if ngay_hieu_luc > ngay_hien_hanh:
-                                # Ngày tương lai -> Cho phép xóa luôn
                                 du_dieu_kien_xoa = True
                             elif ngay_hieu_luc == ngay_hien_hanh:
-                                # Ngày hôm nay -> Kiểm tra trong vòng 3 tiếng
                                 gio_gioi_han = dt_hieu_luc.to_pydatetime() + timedelta(hours=3)
                                 if datetime.now() <= gio_gioi_han:
                                     du_dieu_kien_xoa = True
@@ -234,7 +224,7 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                                 df_all.loc[real_idx, 'Trạng thái'] = 'Xóa'
                                 success_count += 1
                             else:
-                                error_messages.append(f"Dòng {real_idx} (Hiệu lực: {dt_hieu_luc.strftime('%d/%m/%Y %H:%M')}) quá hạn 3 tiếng.")
+                                error_messages.append(f"Dòng {real_idx} quá hạn 3 tiếng.")
                         except Exception as e:
                             error_messages.append(f"Dòng {real_idx} lỗi: {e}")
                     
@@ -254,16 +244,13 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
         if not os.path.exists(path_data_ds): return
         df_all = pd.read_excel(path_data_ds)
         
-        # Lọc các dòng đang Chờ XL
         df_cho = df_all[df_all['Trạng thái'] == 'Chờ XL'].copy()
         
         if df_cho.empty:
             st.info("ℹ️ Không có bản ghi 'Chờ XL'.")
         else:
-            # Thêm cột checkbox (Chọn) vào bảng giao diện
             df_cho.insert(0, 'Chọn', False)
             
-            # Sử dụng st.data_editor để người dùng tích chọn trực tiếp trên bảng
             edited_df_ht = st.data_editor(
                 df_cho,
                 column_config={'Chọn': st.column_config.CheckboxColumn("Tích chọn", required=True)},
@@ -274,7 +261,6 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
             )
             
             if st.button("🚀 Xác nhận Hoàn tất các dòng đã tích chọn", type="primary"):
-                # Lấy danh sách các dòng được tích chọn (True)
                 selected_rows_ht = edited_df_ht[edited_df_ht['Chọn'] == True]
                 
                 if selected_rows_ht.empty:
@@ -290,16 +276,15 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
                             ngay_hieu_luc = dt_hieu_luc.date()
                             ngay_hien_hanh = datetime.now().date()
                             
-                            # Hoàn tất: Bắt buộc ngày hiệu lực phải = ngày hiện hành và trong vòng 3 tiếng
                             if ngay_hieu_luc != ngay_hien_hanh:
-                                error_messages_ht.append(f"Dòng {real_idx}: Ngày hiệu lực ({ngay_hieu_luc.strftime('%d/%m/%Y')}) không phải ngày hôm nay.")
+                                error_messages_ht.append(f"Dòng {real_idx}: Ngày hiệu lực không phải ngày hôm nay.")
                             else:
                                 gio_gioi_han = dt_hieu_luc.to_pydatetime() + timedelta(hours=3)
                                 if datetime.now() <= gio_gioi_han:
                                     df_all.loc[real_idx, 'Trạng thái'] = 'HT'
                                     success_count_ht += 1
                                 else:
-                                    error_messages_ht.append(f"Dòng {real_idx}: Đã quá thời hạn 3 tiếng kể từ mốc {dt_hieu_luc.strftime('%H:%M')}.")
+                                    error_messages_ht.append(f"Dòng {real_idx}: Đã quá thời hạn 3 tiếng.")
                         except Exception as e:
                             error_messages_ht.append(f"Dòng {real_idx} lỗi: {e}")
                     
@@ -317,33 +302,59 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir):
     elif action == "Báo cáo Đăng ký Nộp Lĩnh":
         st.markdown("#### 📊 Báo Cáo Tổng Hợp Đăng Ký Nộp Lĩnh")
         if not os.path.exists(path_data_ds):
-            st.warning("⚠️ Chưa có dữ liệu đăng ký.")
+            st.warning("⚠️ Chưa có file dữ liệu đăng ký.")
             return
             
+        try:
+            df_rep = pd.read_excel(path_data_ds)
+        except Exception as e:
+            st.error(f"❌ Không thể đọc file dữ liệu: {e}")
+            return
+
+        if df_rep.empty:
+            st.warning("⚠️ File dữ liệu đang trống.")
+            return
+
         col_f1, col_f2, col_f3, col_f4 = st.columns(4)
         with col_f1: rep_start = st.date_input("Từ ngày hiệu lực", value=date.today())
         with col_f2: rep_end = st.date_input("Đến ngày hiệu lực", value=date.today())
         with col_f3: rep_coso = st.selectbox("Chọn Cơ sở", ["All"] + list_coso)
-        with col_f4: rep_tt = st.multiselect("Chọn Trạng thái", ["Xóa", "HT", "Chờ XL"], default=["HT", "Chờ XL"])
+        
+        available_tt = df_rep['Trạng thái'].dropna().astype(str).unique().tolist() if 'Trạng thái' in df_rep.columns else ["Chờ XL", "HT"]
+        with col_f4: rep_tt = st.multiselect("Chọn Trạng thái", available_tt, default=available_tt)
 
         rep_tiente = st.selectbox("Chọn Loại tiền tệ báo cáo", list_tiente)
 
         if st.button("⚡ Chạy Báo Cáo", type="primary"):
-            df_rep = pd.read_excel(path_data_ds)
-            if df_rep.empty:
-                st.warning("⚠️ File dữ liệu trống.")
-                return
+            def safe_parse_date(val):
+                try:
+                    dt = pd.to_datetime(val, errors='coerce')
+                    if pd.notnull(dt):
+                        return dt.date()
+                except:
+                    pass
+                return None
 
-            df_rep['Clean_Date'] = pd.to_datetime(df_rep['Ngày hiệu lực']).dt.date
-            mask = (df_rep['Clean_Date'] >= rep_start) & (df_rep['Clean_Date'] <= rep_end)
-            if rep_coso != "All": mask = mask & (df_rep['Cơ sở'] == rep_coso)
-            if rep_tt: mask = mask & (df_rep['Trạng thái'].isin(rep_tt))
-            mask = mask & (df_rep['Loại tiền'] == rep_tiente)
+            df_rep['Clean_Date'] = df_rep['Ngày hiệu lực'].apply(safe_parse_date)
+            df_rep = df_rep.dropna(subset=['Clean_Date'])
+
+            start_d = pd.to_datetime(rep_start).date()
+            end_d = pd.to_datetime(rep_end).date()
+
+            mask = (df_rep['Clean_Date'] >= start_d) & (df_rep['Clean_Date'] <= end_d)
+            
+            if rep_coso != "All": 
+                mask = mask & (df_rep['Cơ sở'].astype(str).str.strip() == str(rep_coso).strip())
+                
+            if rep_tt: 
+                mask = mask & (df_rep['Trạng thái'].astype(str).isin(rep_tt))
+            
+            mask = mask & (df_rep['Loại tiền'].astype(str).str.strip() == str(rep_tiente).strip())
 
             df_filtered = df_rep[mask].copy()
 
             if df_filtered.empty:
-                st.info("ℹ️ Không tìm thấy bản ghi phù hợp theo khoảng ngày hiệu lực đã chọn.")
+                st.info(f"ℹ️ Không tìm thấy bản ghi nào trong khoảng từ {start_d.strftime('%d/%m/%Y')} đến {end_d.strftime('%d/%m/%Y')}. (Mẹo: Hãy thử mở rộng khoảng ngày vì trong file có thể có dữ liệu ở các ngày khác).")
             else:
                 df_filtered['Số tiền Nộp'] = df_filtered.apply(lambda r: r['Số tiền'] if str(r['Loại GD']).strip() == 'Nộp' else 0, axis=1)
                 df_filtered['Số tiền Lĩnh'] = df_filtered.apply(lambda r: r['Số tiền'] if str(r['Loại GD']).strip() == 'Lĩnh' else 0, axis=1)
