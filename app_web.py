@@ -261,7 +261,7 @@ report_type = st.sidebar.selectbox(
         "Báo Cáo Tổng Hợp (Tiếp Quỹ & Thu Gom)", 
         "Báo Cáo Nộp Lĩnh NHNN (Ds_NopLinhNHNN)",
         "Báo Cáo Hoạt Động ATM (BC_atm)",
-        "Giao Dịch Phát Sinh Lớn (Ds_Tiepquythugom)",
+        "Giao Dịch Phát Sinh Lớn (Ds_TiepQuyThuGom)",
         "Báo Cáo XNK Theo Loại Tiền & Đối Tác",  
         "Nhập Đăng Ký Nộp Lĩnh",  
         "Báo Cáo SLA Kho Quỹ",
@@ -608,9 +608,9 @@ elif report_type == "Báo Cáo Hoạt Động ATM (BC_atm)":
                     st.error(f"❌ Đã xảy ra lỗi trong quá trình xử lý báo cáo ATM: {str(e)}")
 
 
-elif report_type == "Giao Dịch Phát Sinh Lớn (Ds_Tiepquythugom)":
+elif report_type == "Giao Dịch Phát Sinh Lớn (Ds_TiepQuyThuGom)":
     st.subheader("🔥 MODULE LỌC GIAO DỊCH PHÁT SINH LỚN (KỲ NÀY & KỲ TRƯỚC)")
-    st.markdown("Trích xuất các giao dịch có giá trị lớn từ file `Ds_Tiepquythugom.xlsx` phân tách theo VND và USD.")
+    st.markdown("Trích xuất các giao dịch có giá trị lớn từ file `Ds_TiepQuyThuGom.xlsx` phân tách theo VND và USD.")
     
     top_n_choice = st.slider("Chọn số lượng giao dịch lớn cần lấy (Top N theo mỗi nghiệp vụ/cơ sở):", min_value=1, max_value=50, value=10)
     
