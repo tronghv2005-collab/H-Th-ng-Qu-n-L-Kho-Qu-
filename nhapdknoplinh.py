@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 
 def show_dang_ky_nop_linh_page(base_dir, shared_data_dir, current_user="System"):
     
@@ -16,6 +16,9 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir, current_user="System")
     
     os.makedirs(shared_data_dir, exist_ok=True)
     os.makedirs(param_dir, exist_ok=True)
+
+    # Khởi tạo múi giờ Việt Nam (UTC+7) để chạy chuẩn xác trên mọi đám mây
+    TZ_VN = timezone(timedelta(hours=7))
 
     # 1. Đọc danh sách Cơ sở
     list_coso = []
@@ -77,10 +80,10 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir, current_user="System")
         col1, col2 = st.columns(2)
         with col1:
             t_coso = st.selectbox("1. Tên Cơ sở", list_coso, key="inp_coso")
-            t_ngay_dk = date.today()
+            t_ngay_dk = datetime.now(TZ_VN).date()
             st.text(f"2. Ngày Đăng ký: {t_ngay_dk.strftime('%d/%m/%Y')}")
             
-            t_ngay_hl = st.date_input("3. Ngày hiệu lực", value=date.today(), key="inp_ngay_hl")
+            t_ngay_hl = st.date_input("3. Ngày hiệu lực", value=t_ngay_dk, key="inp_ngay_hl")
             
             t_gio_nop_rut_str = st.text_input("4. Giờ Nộp / Rút (Gõ liền số, vd: 930 hoặc 1430)", value="", key="inp_gio", placeholder="Ví dụ: 930")
             
@@ -143,7 +146,7 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir, current_user="System")
                     'Loại tiền': t_loai_tien,
                     'Trạng thái': 'Chờ XL',
                     'NguoiNhap': str(current_user),
-                    'NguoiXL': str(current_user)  # Lúc chờ xử lý, Người xử lý ban đầu trùng với Người nhập
+                    'NguoiXL': str(current_user)
                 }
                 st.session_state.confirm_ghi = True
             except Exception as e:
@@ -220,6 +223,7 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir, current_user="System")
                 else:
                     success_count = 0
                     error_messages = []
+                    now_vn = datetime.now(TZ_VN)
                     
                     for real_idx, row in selected_rows.iterrows():
                         try:
@@ -231,10 +235,10 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir, current_user="System")
                                 if len(s_val) >= 10 and s_val[4] == '-' and s_val[7] == '-':
                                     dt_hieu_luc = datetime.strptime(s_val[:10], '%Y-%m-%d')
                                 else:
-                                    dt_hieu_luc = datetime.now()
+                                    dt_hieu_luc = now_vn.replace(tzinfo=None)
                             
                             ngay_hieu_luc = dt_hieu_luc.date()
-                            ngay_hien_hanh = datetime.now().date()
+                            ngay_hien_hanh = now_vn.date()
                             
                             du_dieu_kien_xoa = False
                             if ngay_hieu_luc > ngay_hien_hanh:
@@ -242,15 +246,15 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir, current_user="System")
                             elif ngay_hieu_luc == ngay_hien_hanh:
                                 base_dt = dt_hieu_luc if isinstance(dt_hieu_luc, datetime) else datetime.combine(ngay_hieu_luc, datetime.min.time())
                                 gio_gioi_han = base_dt + timedelta(hours=3)
-                                if datetime.now() <= gio_gioi_han:
+                                if now_vn.replace(tzinfo=None) <= gio_gioi_han:
                                     du_dieu_kien_xoa = True
                             
                             if du_dieu_kien_xoa:
                                 df_all.loc[real_idx, 'Trạng thái'] = 'Xóa'
-                                df_all.loc[real_idx, 'NguoiXL'] = str(current_user)  # Ghi nhận người thực hiện Xóa
+                                df_all.loc[real_idx, 'NguoiXL'] = str(current_user)
                                 success_count += 1
                             else:
-                                error_messages.append(f"Dòng {real_idx} quá hạn 3 tiếng.")
+                                error_messages.append(f"Dòng {real_idx} đã quá hạn 3 tiếng so với giờ hiện tại.")
                         except Exception as e:
                             error_messages.append(f"Dòng {real_idx} lỗi: {e}")
                     
@@ -301,6 +305,7 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir, current_user="System")
                 else:
                     success_count_ht = 0
                     error_messages_ht = []
+                    now_vn = datetime.now(TZ_VN)
                     
                     for real_idx, row in selected_rows_ht.iterrows():
                         try:
@@ -312,22 +317,22 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir, current_user="System")
                                 if len(s_val) >= 10 and s_val[4] == '-' and s_val[7] == '-':
                                     dt_hieu_luc = datetime.strptime(s_val[:10], '%Y-%m-%d')
                                 else:
-                                    dt_hieu_luc = datetime.now()
+                                    dt_hieu_luc = now_vn.replace(tzinfo=None)
                                     
                             ngay_hieu_luc = dt_hieu_luc.date()
-                            ngay_hien_hanh = datetime.now().date()
+                            ngay_hien_hanh = now_vn.date()
                             
                             if ngay_hieu_luc != ngay_hien_hanh:
                                 error_messages_ht.append(f"Dòng {real_idx}: Ngày hiệu lực không phải ngày hôm nay.")
                             else:
                                 base_dt = dt_hieu_luc if isinstance(dt_hieu_luc, datetime) else datetime.combine(ngay_hieu_luc, datetime.min.time())
                                 gio_gioi_han = base_dt + timedelta(hours=3)
-                                if datetime.now() <= gio_gioi_han:
+                                if now_vn.replace(tzinfo=None) <= gio_gioi_han:
                                     df_all.loc[real_idx, 'Trạng thái'] = 'HT'
-                                    df_all.loc[real_idx, 'NguoiXL'] = str(current_user)  # Ghi nhận người thực hiện Hoàn tất
+                                    df_all.loc[real_idx, 'NguoiXL'] = str(current_user)
                                     success_count_ht += 1
                                 else:
-                                    error_messages_ht.append(f"Dòng {real_idx}: Đã quá thời hạn 3 tiếng.")
+                                    error_messages_ht.append(f"Dòng {real_idx}: Đã quá thời hạn 3 tiếng so với giờ hiện tại.")
                         except Exception as e:
                             error_messages_ht.append(f"Dòng {real_idx} lỗi: {e}")
                     
@@ -364,8 +369,8 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir, current_user="System")
             return
 
         col_f1, col_f2, col_f3, col_f4 = st.columns(4)
-        with col_f1: rep_start = st.date_input("Từ ngày hiệu lực", value=date.today(), key="rep_start_date")
-        with col_f2: rep_end = st.date_input("Đến ngày hiệu lực", value=date.today(), key="rep_end_date")
+        with col_f1: rep_start = st.date_input("Từ ngày hiệu lực", value=datetime.now(TZ_VN).date(), key="rep_start_date")
+        with col_f2: rep_end = st.date_input("Đến ngày hiệu lực", value=datetime.now(TZ_VN).date(), key="rep_end_date")
         with col_f3: rep_coso = st.selectbox("Chọn Cơ sở", ["All"] + list_coso, key="rep_sel_coso")
         
         available_tt = df_rep['Trạng thái'].dropna().astype(str).unique().tolist() if 'Trạng thái' in df_rep.columns else ["Chờ XL", "HT"]
@@ -411,7 +416,6 @@ def show_dang_ky_nop_linh_page(base_dir, shared_data_dir, current_user="System")
                 df_filtered['Số tiền Nộp'] = df_filtered.apply(lambda r: r['Số tiền'] if str(r['Loại GD']).strip() == 'Nộp' else 0, axis=1)
                 df_filtered['Số tiền Lĩnh'] = df_filtered.apply(lambda r: r['Số tiền'] if str(r['Loại GD']).strip() == 'Lĩnh' else 0, axis=1)
 
-                # Kiểm tra an toàn cột NguoiNhap & NguoiXL luôn hiển thị đầy đủ
                 if 'NguoiNhap' not in df_filtered.columns: df_filtered['NguoiNhap'] = ''
                 if 'NguoiXL' not in df_filtered.columns: df_filtered['NguoiXL'] = ''
 
