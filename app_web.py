@@ -397,7 +397,7 @@ def render_sla_violation_dashboard(df_master, shared_data_dir, param_dir, start_
 if report_type == "Báo Cáo Tổng Hợp (Tiếp Quỹ & Thu Gom)":
     st.subheader("📋 MODULE BÁO CÁO TỔNG HỢP TIẾP QUỸ & THU GOM")
     
-    PATH_FILE1 = os.path.join(SHARED_DATA_DIR, "Ds_Tiepquythugom.xlsx")
+    PATH_FILE1 = os.path.join(SHARED_DATA_DIR, "Ds_TiepQuyThuGom.xlsx")
     PATH_FILE2 = os.path.join(SHARED_DATA_DIR, "Ds_Noplinhkhac.xlsx")
     PATH_PARAM_KM = os.path.join(BASE_DIR, "parameters", "Thamso_KM.xlsx")
     PATH_TEMPLATE = os.path.join(BASE_DIR, "templates", "Template_BaoCao1.xlsx")
