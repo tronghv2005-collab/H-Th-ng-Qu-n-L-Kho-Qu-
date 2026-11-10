@@ -134,7 +134,7 @@ def _extract_period_data(df_raw, start_date, end_date, top_n):
     return format_final_df(top_vnd_raw, '__ValVND'), format_final_df(top_usd_raw, '__ValUSD')
 
 def process_giao_dich_lon_report(shared_data_dir, start_curr, end_curr, start_prev, end_prev, top_n=10):
-    file_path = os.path.join(shared_data_dir, "Ds_Tiepquythugom.xlsx")
+    file_path = os.path.join(shared_data_dir, "Ds_TiepQuyThuGom.xlsx")
     if not os.path.exists(file_path):
         return (pd.DataFrame(), pd.DataFrame()), (pd.DataFrame(), pd.DataFrame())
 

@@ -51,7 +51,7 @@ def build_master_employee_pipeline(shared_data_dir, start_str, end_str):
     I - Tạo bảng Danh sách nhân viên tổng hợp từ CẢ FILE 1 (Ds_tiepquythugom) VÀ FILE 2 (Atm).
     Bảo đảm không bị sót nhân sự mảng ATM.
     """
-    f1_path = _find_file_by_keyword(shared_data_dir, "ds_tiepquythugom") or _find_file_by_keyword(shared_data_dir, "tiepquythugom")
+    f1_path = _find_file_by_keyword(shared_data_dir, "Ds_TiepQuyThuGom") or _find_file_by_keyword(shared_data_dir, "tiepquythugom")
     f2_path = _find_file_by_keyword(shared_data_dir, "atm")
     
     df1 = _read_flexible_file(f1_path)
