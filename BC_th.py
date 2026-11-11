@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from openpyxl import load_workbook
+import openpyxl
 import os, re, uuid
 from pathlib import Path
 
@@ -16,57 +17,63 @@ def no_accent_vietnamese(s):
     return re.sub(r'\s+', '', s)
 
 def process_flat_header(file_path):
-    # Đọc file Excel với cấu trúc 2 tầng tiêu đề (header = [0, 1])
-    df = pd.read_excel(file_path, header=[0, 1])
+    try:
+        df = pd.read_excel(file_path, header=[0, 1])
+    except Exception:
+        df = pd.read_excel(file_path, header=0)
+
     new_columns = []
-    current_currency = "THONGTIN"  # Mặc định cho các cột thông tin chung
+    current_currency = "THONGTIN"
     
     for col in df.columns:
-        c1 = str(col[0]).strip() if isinstance(col, tuple) else str(col).strip()
-        c2 = str(col[1]).strip() if isinstance(col, tuple) and len(col) >= 2 else ""
-        
-        # Nếu dòng 1 có tên tiền tệ (không phải Unnamed, không rỗng) thì cập nhật loại tiền hiện tại
-        if "Unnamed" not in c1 and c1 != "" and "nan" not in c1.lower(): 
-            current_currency = c1.upper().strip()
-            
-        clean1, clean2 = no_accent_vietnamese(c1), no_accent_vietnamese(c2)
-        c_combined = (clean1 + "_" + clean2)
-        
-        # Nhận diện các cột thông tin quan trọng
-        if "sodien" in c_combined or "so_dien" in c_combined:
-            new_columns.append(f"IGNORE_COL_{len(new_columns)}")
-            continue
-            
-        if "ngayhieuluc" in c_combined or ("ngay" in c_combined and "luc" in c_combined) or "ngay" in clean2:
-            new_columns.append("NgayHieuLuc")
-        elif "loainghiepvu" in c_combined or "nghiepvu" in c_combined or "nghiep" in clean2:
-            new_columns.append("LoaiNghiepVu")
-        elif "thuquy" in c_combined or "thu quy" in clean2:
-            new_columns.append("ThuQuy")
-        elif "laixe" in c_combined or "lai xe" in clean2:
-            new_columns.append("LaiXe")
-        elif "tuyentiepquy" in c_combined or "tuyen" in c_combined:
-            new_columns.append("TuyenTiepQuy")
-        elif "khachhang" in c_combined or "tenkh" in c_combined or "khach" in clean2:
-            new_columns.append("KhachHang")
-        elif "coso" in c_combined or "co so" in clean2:
-            new_columns.append("CoSo")
-        elif "diadiem" in c_combined or "noplinh" in c_combined:
-            new_columns.append("DiaDiemNopLinh")
-        elif "thanh tien" in c2.lower() or "thanhtien" in clean1 or "thanhtien" in clean2: 
-            new_columns.append(f"{current_currency}_ThanhTien")
-        else: 
-            denom_clean = re.sub(r'[.,\s]', '', c2)
-            if denom_clean.isdigit():
-                new_columns.append(f"{current_currency}_{denom_clean}")
+        try:
+            if isinstance(col, tuple):
+                c1 = str(col[0]).strip() if len(col) > 0 and pd.notnull(col[0]) else ""
+                c2 = str(col[1]).strip() if len(col) > 1 and pd.notnull(col[1]) else ""
             else:
-                # Nếu tầng 2 là Unnamed, lấy luôn tên tầng 1 làm tên cột
-                if "Unnamed" in c2 or c2 == "":
-                    new_columns.append(f"{current_currency}_{c1}")
+                c1 = str(col).strip()
+                c2 = ""
+            
+            if "Unnamed" not in c1 and c1 != "" and "nan" not in c1.lower(): 
+                current_currency = c1.upper().strip()
+                
+            clean1, clean2 = no_accent_vietnamese(c1), no_accent_vietnamese(c2)
+            c_combined = (clean1 + "_" + clean2)
+            
+            if "sodien" in c_combined or "so_dien" in c_combined:
+                new_columns.append(f"IGNORE_COL_{len(new_columns)}")
+                continue
+                
+            if "ngayhieuluc" in c_combined or ("ngay" in c_combined and "luc" in c_combined) or "ngay" in clean2:
+                new_columns.append("NgayHieuLuc")
+            elif "loainghiepvu" in c_combined or "nghiepvu" in c_combined or "nghiep" in clean2:
+                new_columns.append("LoaiNghiepVu")
+            elif "thuquy" in c_combined or "thu quy" in clean2:
+                new_columns.append("ThuQuy")
+            elif "laixe" in c_combined or "lai xe" in clean2:
+                new_columns.append("LaiXe")
+            elif "tuyentiepquy" in c_combined or "tuyen" in c_combined:
+                new_columns.append("TuyenTiepQuy")
+            elif "khachhang" in c_combined or "tenkh" in c_combined or "khach" in clean2:
+                new_columns.append("KhachHang")
+            elif "coso" in c_combined or "co so" in clean2:
+                new_columns.append("CoSo")
+            elif "diadiem" in c_combined or "noplinh" in c_combined:
+                new_columns.append("DiaDiemNopLinh")
+            elif "thanh tien" in c2.lower() or "thanhtien" in clean1 or "thanhtien" in clean2: 
+                new_columns.append(f"{current_currency}_ThanhTien")
+            else: 
+                denom_clean = re.sub(r'[.,\s]', '', c2)
+                if denom_clean.isdigit():
+                    new_columns.append(f"{current_currency}_{denom_clean}")
                 else:
-                    new_columns.append(f"{current_currency}_{c2}")
+                    if "Unnamed" in c2 or c2 == "":
+                        new_columns.append(f"{current_currency}_{c1}")
+                    else:
+                        new_columns.append(f"{current_currency}_{c2}")
+        except Exception:
+            new_columns.append(f"Col_{len(new_columns)}")
                     
-    # Xử lý trùng lặp tên cột tránh lỗi duplicate
     counts = {}
     final_cols = []
     for c in new_columns:
@@ -117,16 +124,14 @@ def clean_and_prepare_file2(file_path):
                 r_chi = row.copy()
                 r_chi['LoaiNghiepVu'] = 'Chi tiền cơ sở khác'
                 cs_val = str(r_chi.get('CoSo', '')).strip()
-                if cs_val and cs_val.lower() != 'nan':
-                    r_chi['CoSo'] = cs_val
+                if cs_val and cs_val.lower() != 'nan': r_chi['CoSo'] = cs_val
                 r_chi['Is_Count_Turn'] = 1
                 records_to_add.append(r_chi)
                 
                 r_thu = row.copy()
                 r_thu['LoaiNghiepVu'] = 'Thu tiền cơ sở khác'
                 kh_val = str(r_thu.get('KhachHang', '')).strip()
-                if kh_val and kh_val.lower() != 'nan':
-                    r_thu['CoSo'] = kh_val
+                if kh_val and kh_val.lower() != 'nan': r_thu['CoSo'] = kh_val
                 r_thu['Is_Count_Turn'] = 1
                 records_to_add.append(r_thu)
                 
@@ -188,14 +193,15 @@ def _finalize_file_data(df, is_file2=False):
     for col in df.columns:
         if "_" in col and "IGNORE_COL" not in col and not any(k in col for k in ['NgayHieuLuc', 'LoaiNghiepVu', 'ThuQuy', 'LaiXe', 'TuyenTiepQuy', 'KhachHang', 'CoSo', 'Chuyen_Key', 'LoaiDoiTuong', 'DiaDiemNopLinh', 'Is_Count_Turn', 'Is_Child_Tag']):
             parts = col.split("_")
-            prefix = str(parts[0]).upper().strip()
-            suffix = str(parts[-1]).split(".")[0].lower().strip()
-            
-            if "thanhtien" not in suffix and suffix.isdigit():
-                all_numeric_money_cols.append(col)
-                matched_cc = next((cc for cc in cac_tien_chinh if cc in prefix), None)
-                if matched_cc:
-                    main_money_cols[matched_cc].append(col)
+            if len(parts) >= 2:
+                prefix = str(parts[0]).upper().strip()
+                suffix = str(parts[-1]).split(".")[0].lower().strip()
+                
+                if "thanhtien" not in suffix and suffix.isdigit():
+                    all_numeric_money_cols.append(col)
+                    matched_cc = next((cc for cc in cac_tien_chinh if cc in prefix), None)
+                    if matched_cc:
+                        main_money_cols[matched_cc].append(col)
 
     for cc in cac_tien_chinh:
         m_cols = main_money_cols[cc]
@@ -241,8 +247,6 @@ def aggregate_center_summary(df_period):
 
     thu_filters = ['Thu gom cuối ngày', 'Thu gom trong ngày', 'CN Nộp tiền', 'Thu tiền (CN Nộp tiền)' ]
     chi_filters = ['Tiếp quỹ đầu ngày', 'Tiếp quỹ trong ngày', 'CN Lĩnh tiền', 'Chi tiền (CN Lĩnh tiền)']
-    
-    # Bổ sung bộ lọc cho nội bộ
     thu_nb_filters = ['Thu gom cuối ngày', 'Thu gom trong ngày', 'CN Nộp tiền', 'Thu tiền (CN Nộp tiền)', 'Thu tiền cơ sở khác']
     chi_nb_filters = ['Tiếp quỹ đầu ngày', 'Tiếp quỹ trong ngày', 'CN Lĩnh tiền', 'Chi tiền (CN Lĩnh tiền)', 'Chi tiền cơ sở khác']
 
@@ -269,7 +273,6 @@ def aggregate_center_summary(df_period):
             s_chi['LoaiDoiTuong'] = 'Toàn bộ'
             df_cs_nv = pd.concat([df_cs_nv, pd.DataFrame([s_chi])], ignore_index=True)
 
-        # BỔ SUNG: Tổng thu nội bộ theo từng cơ sở
         df_cs_thunb = df_cs[df_cs['LoaiNghiepVu'].isin(thu_nb_filters)]
         if not df_cs_thunb.empty:
             s_thunb = df_cs_thunb.agg(agg_d).to_dict()
@@ -278,7 +281,6 @@ def aggregate_center_summary(df_period):
             s_thunb['LoaiDoiTuong'] = 'Toàn bộ'
             df_cs_nv = pd.concat([df_cs_nv, pd.DataFrame([s_thunb])], ignore_index=True)
 
-        # BỔ SUNG: Tổng chi nội bộ theo từng cơ sở
         df_cs_chinb = df_cs[df_cs['LoaiNghiepVu'].isin(chi_nb_filters)]
         if not df_cs_chinb.empty:
             s_chinb = df_cs_chinb.agg(agg_d).to_dict()
@@ -309,7 +311,6 @@ def aggregate_center_summary(df_period):
         s_cchi['LoaiDoiTuong'] = 'Toàn bộ'
         center_rows.append(s_cchi)
 
-    # BỔ SUNG: Tổng thu nội bộ Toàn trung tâm
     df_center_thunb = df_period[df_period['LoaiNghiepVu'].isin(thu_nb_filters)]
     if not df_center_thunb.empty:
         s_cthunb = df_center_thunb.agg(agg_d).to_dict()
@@ -318,7 +319,6 @@ def aggregate_center_summary(df_period):
         s_cthunb['LoaiDoiTuong'] = 'Toàn bộ'
         center_rows.append(s_cthunb)
 
-    # BỔ SUNG: Tổng chi nội bộ Toàn trung tâm
     df_center_chinb = df_period[df_period['LoaiNghiepVu'].isin(chi_nb_filters)]
     if not df_center_chinb.empty:
         s_cchinb = df_center_chinb.agg(agg_d).to_dict()
@@ -418,7 +418,6 @@ def format_summary_dataframe(df_prev, df_curr, all_nghiep_vu, all_coso):
         if cs != "Toàn trung tâm":
             rows.append({'LoaiNghiepVu': 'Tổng Thu', 'CoSo': cs, 'LoaiDoiTuong': 'Toàn bộ'})
             rows.append({'LoaiNghiepVu': 'Tổng Chi', 'CoSo': cs, 'LoaiDoiTuong': 'Toàn bộ'})
-            # BỔ SUNG: Khung dòng cho từng cơ sở
             rows.append({'LoaiNghiepVu': 'Tổng thu nội bộ', 'CoSo': cs, 'LoaiDoiTuong': 'Toàn bộ'})
             rows.append({'LoaiNghiepVu': 'Tổng chi nội bộ', 'CoSo': cs, 'LoaiDoiTuong': 'Toàn bộ'})
 
@@ -442,17 +441,119 @@ def format_summary_dataframe(df_prev, df_curr, all_nghiep_vu, all_coso):
     check_cols = [c for c in f_df.columns if c not in ['LoaiNghiepVu', 'CoSo', 'LoaiDoiTuong']]
     f_df = f_df[(f_df[check_cols] != 0).any(axis=1)].copy()
     return f_df
+import openpyxl
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.utils import get_column_letter
 
-def write_to_template(final_table, template_path, output_path):
-    if not os.path.exists(template_path): final_table.to_excel(output_path, index=False); return
-    wb = load_workbook(template_path); ws = wb.active
+def write_to_template(final_table, template_path, output_path, start_prev=None, end_prev=None, start_curr=None, end_curr=None):
+    wb = None
+    if os.path.exists(template_path):
+        try:
+            wb = load_workbook(template_path)
+            ws = wb.active
+        except Exception:
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "BaoCao_TongHop"
+    else:
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "BaoCao_TongHop"
+
+    # Định dạng style chung cho Header & Tiêu đề
+    center_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    left_align = Alignment(horizontal='left', vertical='center')
+    right_align = Alignment(horizontal='right', vertical='center')
+    
+    # 1. CHÈN VÀ CĂN GIỮA TIÊU ĐỀ KỲ BÁO CÁO Ở PHẦN HEADER
+    if start_prev and end_prev and start_curr and end_curr:
+        ws.insert_rows(1, amount=4) # Chèn 4 dòng phía trên
+        
+        ws['A1'] = "HỆ THỐNG TRUNG TÂM TIẾP QUỸ & NHNN - BÁO CÁO TỔNG HỢP HOẠT ĐỘNG"
+        ws['A1'].font = Font(bold=True, size=13, color="1F4E78")
+        ws['A1'].alignment = center_align
+        
+        ws['A2'] = f"• Kỳ trước: Từ ngày {start_prev.strftime('%d/%m/%Y')} đến {end_prev.strftime('%d/%m/%Y')}"
+        ws['A2'].font = Font(italic=True, size=11, color="555555")
+        ws['A2'].alignment = center_align
+        
+        ws['A3'] = f"• Kỳ báo cáo: Từ ngày {start_curr.strftime('%d/%m/%Y')} đến {end_curr.strftime('%d/%m/%Y')}"
+        ws['A3'].font = Font(bold=True, size=11, color="1F4E78")
+        ws['A3'].alignment = center_align
+
     data_rows = final_table.to_dict(orient='records')
-    for r in range(4, ws.max_row + 1):
-        nv = str(ws.cell(row=r, column=1).value).strip()
-        cs = str(ws.cell(row=r, column=2).value).strip()
-        dt = str(ws.cell(row=r, column=3).value).strip()
-        m = next((d for d in data_rows if str(d.get('LoaiNghiepVu', '')).strip() == nv and str(d.get('CoSo', '')).strip() == cs and str(d.get('LoaiDoiTuong', '')).strip() == dt), None)
-        if m:
-            v_keys = [k for k in m.keys() if k not in ['LoaiNghiepVu', 'CoSo', 'LoaiDoiTuong']]
-            for idx, k in enumerate(v_keys): ws.cell(row=r, column=4 + idx).value = m[k]
-    wb.save(output_path); wb.close()
+    
+    try:
+        start_row = 6 if (start_prev and end_prev) else 4
+        
+        if not os.path.exists(template_path) or ws.max_row <= start_row:
+            with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+                final_table.to_excel(writer, index=False, startrow=start_row-1)
+            wb = load_workbook(output_path)
+            ws = wb.active
+            if start_prev and end_prev:
+                ws['A1'] = "HỆ THỐNG TRUNG TÂM TIẾP QUỸ & NHNN - BÁO CÁO TỔNG HỢP HOẠT ĐỘNG"
+                ws['A1'].alignment = center_align
+                ws['A2'] = f"• Kỳ trước: Từ ngày {start_prev.strftime('%d/%m/%Y')} đến {end_prev.strftime('%d/%m/%Y')}"
+                ws['A2'].alignment = center_align
+                ws['A3'] = f"• Kỳ báo cáo: Từ ngày {start_curr.strftime('%d/%m/%Y')} đến {end_curr.strftime('%d/%m/%Y')}"
+                ws['A3'].alignment = center_align
+        else:
+            for r in range(start_row, ws.max_row + 1):
+                cell_val_1 = ws.cell(row=r, column=1).value
+                cell_val_2 = ws.cell(row=r, column=2).value
+                cell_val_3 = ws.cell(row=r, column=3).value
+                
+                if not cell_val_1: 
+                    continue
+                    
+                nv = str(cell_val_1).strip()
+                cs = str(cell_val_2).strip() if cell_val_2 else ""
+                dt = str(cell_val_3).strip() if cell_val_3 else ""
+                
+                m = next((d for d in data_rows if str(d.get('LoaiNghiepVu', '')).strip() == nv and str(d.get('CoSo', '')).strip() == cs and str(d.get('LoaiDoiTuong', '')).strip() == dt), None)
+                if m:
+                    v_keys = [k for k in m.keys() if k not in ['LoaiNghiepVu', 'CoSo', 'LoaiDoiTuong']]
+                    for idx, k in enumerate(v_keys):
+                        target_col = 4 + idx
+                        ws.cell(row=r, column=target_col).value = m[k]
+
+        # 2. ĐỊNH DẠNG SỐ LIỆU (LÀM TRÒN KHÔNG SỐ LẺ + DẤU PHẨY NGĂN CÁCH HÀNG NGHÌN) & CĂN CHỈNH CỘT
+        header_row_idx = start_row - 1 if not os.path.exists(template_path) else start_row - 1
+        
+        for col_idx in range(1, ws.max_column + 1):
+            col_letter = get_column_letter(col_idx)
+            max_len = 0
+            
+            for row_idx in range(header_row_idx, ws.max_row + 1):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                val = cell.value
+                
+                # Căn lề: Cột chữ căn trái/giữa, cột số lượng/tiền tệ căn phải
+                if row_idx == header_row_idx:
+                    cell.alignment = center_align
+                    cell.font = Font(bold=True, size=10, color="FFFFFF")
+                    # Tô nền xanh đậm cho tiêu đề bảng
+                    cell.fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+                else:
+                    if col_idx <= 3:
+                        cell.alignment = left_align
+                    else:
+                        cell.alignment = right_align
+                        # Định dạng số nguyên: không số lẻ, có dấu phẩy ngăn cách hàng nghìn (#,##0)
+                        if isinstance(val, (int, float)) and pd.notnull(val):
+                            cell.number_format = '#,##0'
+                            cell.value = round(val) # Làm tròn số không để số lẻ
+                
+                # Tính toán độ rộng tự động cho cột
+                val_str = str(val or '')
+                if len(val_str) > max_len:
+                    max_len = len(val_str)
+                    
+            ws.column_dimensions[col_letter].width = max(max_len + 4, 14)
+
+    except Exception as e:
+        print(f"⚠️ Cảnh báo định dạng Excel: {e}")
+                
+    wb.save(output_path)
+    wb.close()

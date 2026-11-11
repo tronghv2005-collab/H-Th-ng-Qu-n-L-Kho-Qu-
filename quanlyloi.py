@@ -125,7 +125,7 @@ def show_quan_ly_loi_page(base_dir, shared_data_dir, current_user="System"):
             col1, col2 = st.columns(2)
             with col1:
                 st.text(f"1. Ngày nhập (Hiện hành): {today_vn.strftime('%d/%m/%Y')}")
-                t_ngay_phat_sinh = st.date_input("2. Ngày phát sinh lỗi (Phải trước ngày hiện hành)", value=today_vn - timedelta(days=1))
+                t_ngay_phat_sinh = st.date_input("2. Ngày phát sinh lỗi (Phải trước ngày hiện hành)", value=today_vn - timedelta(days=0))
                 
                 t_ten_cb_chon = st.selectbox("3. Cán bộ liên quan", list_canbo_display)
                 t_ma_nv_chon = t_ten_cb_chon.split('-')[0].strip() if '-' in t_ten_cb_chon else t_ten_cb_chon.split()[0].strip()
@@ -157,8 +157,8 @@ def show_quan_ly_loi_page(base_dir, shared_data_dir, current_user="System"):
             submit_btn = st.form_submit_button("💾 Lưu bản ghi lỗi", use_container_width=True)
 
             if submit_btn:
-                if t_ngay_phat_sinh >= today_vn:
-                    st.error("❌ Lỗi: Ngày phát sinh lỗi bắt buộc phải nhỏ hơn Ngày hiện hành!")
+                if t_ngay_phat_sinh > today_vn:
+                    st.error("❌ Lỗi: Ngày phát sinh lỗi bắt buộc phải nhỏ hơn hoặc bằng Ngày hiện hành!")
                 elif not t_mota.strip():
                     st.warning("⚠️ Vui lòng nhập mô tả chi tiết lỗi.")
                 else:

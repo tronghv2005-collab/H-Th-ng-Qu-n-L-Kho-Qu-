@@ -5,8 +5,6 @@ from datetime import datetime, date
 import calendar
 import os
 import hashlib
-import plotly.express as px
-import plotly.graph_objects as go
 
 # Import các module báo cáo
 try:
@@ -54,6 +52,11 @@ try:
 except ImportError:
     kpi_module = None
 
+try:
+    import bao_cao_word_module as bc_word
+except ImportError:
+    bc_word = None
+
 # ==================== ĐỊNH NGHĨA THƯ MỤC DÙNG CHUNG ====================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SHARED_DATA_DIR = os.path.join(BASE_DIR, "data_source")
@@ -64,7 +67,6 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # ==================== HỆ THỐNG XÁC THỰC & BẢO MẬT ĐĂNG NHẬP (CHUẨN MaNV) ====================
 def hash_password(password):
-    """Hàm băm mật khẩu bằng SHA-256"""
     return hashlib.sha256(str(password).encode('utf-8')).hexdigest()
 
 def check_login_system(base_dir):
@@ -72,12 +74,11 @@ def check_login_system(base_dir):
     path_canbo = os.path.join(param_dir, "Thamso_canbo.xlsx")
     os.makedirs(param_dir, exist_ok=True)
 
-    # Khởi tạo file mẫu cán bộ nếu chưa có
     if not os.path.exists(path_canbo):
         try:
             df_init_cb = pd.DataFrame([
-                {'MaNV': '12345', 'MatKhau': hash_password('00'), 'TrangThai': True, 'TenNV': 'Nguyễn Văn A', 'NhomQuyen': 'KSV', 'CoSo': 'Cơ sở 1'},
-                {'MaNV': '67890', 'MatKhau': hash_password('00'), 'TrangThai': True, 'TenNV': 'Trần Thị B', 'NhomQuyen': 'NV', 'CoSo': 'Cơ sở 2'}
+                {'MaNV': '12345', 'MatKhau': hash_password('00'), 'TrangThai': True, 'TenNV': '12345 - Nguyễn Văn A', 'NhomQuyen': 'KSV', 'CoSo': 'Cơ sở 1'},
+                {'MaNV': '67890', 'MatKhau': hash_password('00'), 'TrangThai': True, 'TenNV': '67890 - Trần Thị B', 'NhomQuyen': 'NV', 'CoSo': 'Cơ sở 2'}
             ])
             df_init_cb['MaNV'] = df_init_cb['MaNV'].astype(str)
             df_init_cb['MatKhau'] = df_init_cb['MatKhau'].astype(str)
@@ -117,22 +118,18 @@ def check_login_system(base_dir):
                     
                     if not user_row.empty:
                         db_pass = str(user_row.iloc[0]['MatKhau']).strip()
-                        
                         raw_trang_thai = user_row.iloc[0]['TrangThai']
-                        if isinstance(raw_trang_thai, str):
-                            is_first_login = raw_trang_thai.strip().lower() in ['true', '1', 'yes']
-                        else:
-                            is_first_login = bool(raw_trang_thai)
+                        is_first_login = raw_trang_thai.strip().lower() in ['true', '1', 'yes'] if isinstance(raw_trang_thai, str) else bool(raw_trang_thai)
                         
                         input_pass_clean = password.strip()
                         input_check = input_pass_clean if (is_first_login and (db_pass == input_pass_clean or db_pass == hash_password(input_pass_clean))) else hash_password(input_pass_clean)
                         
                         if db_pass == input_check or (is_first_login and db_pass == input_pass_clean):
                             col_ten = next((c for c in df_cb.columns if 'ten' in str(c).lower() or 'tên' in str(c).lower()), None)
-                            ten_nv = str(user_row.iloc[0][col_ten]).strip() if (col_ten and pd.notnull(user_row.iloc[0][col_ten])) else "Cán bộ"
+                            ten_nv = str(user_row.iloc[0][col_ten]).strip() if (col_ten and pd.notnull(user_row.iloc[0][col_ten])) else username.strip()
                             
                             st.session_state.current_manv = username.strip()
-                            st.session_state.current_user = f"{username.strip()} - {ten_nv}"
+                            st.session_state.current_user = ten_nv
                             st.session_state.logged_in = True
                             st.session_state.force_change_pass = is_first_login
                             st.rerun()
@@ -144,13 +141,8 @@ def check_login_system(base_dir):
                     st.error(f"❌ Lỗi đọc file danh sách cán bộ: {e}")
         return False
 
-    # Bắt buộc đổi mật khẩu trong lần đầu đăng nhập (Không giới hạn độ dài/độ mạnh)
     if st.session_state.force_change_pass:
-        st.set_page_config(
-            page_title="Đổi Mật Khẩu Lần Đầu",
-            page_icon="⚠️",
-            layout="centered"
-        )
+        st.set_page_config(page_title="Đổi Mật Khẩu Lần Đầu", page_icon="⚠️", layout="centered")
         st.warning("⚠️ **Đăng nhập lần đầu: Vui lòng nhập mật khẩu mới để tiếp tục!**")
         
         with st.form("change_pass_form_main"):
@@ -166,38 +158,25 @@ def check_login_system(base_dir):
                 else:
                     try:
                         df_cb = pd.read_excel(path_canbo, dtype={'MaNV': str, 'MatKhau': str})
-                        df_cb['MaNV'] = df_cb['MaNV'].str.strip()
-                        df_cb['MatKhau'] = df_cb['MatKhau'].str.strip()
-                        
                         target_ma = str(st.session_state.get('current_manv', '')).strip()
-                        
-                        idx = df_cb[df_cb['MaNV'] == target_ma].index
+                        idx = df_cb[df_cb['MaNV'].str.strip() == target_ma].index
                         if not idx.empty:
                             df_cb.loc[idx, 'MatKhau'] = str(hash_password(new_pass.strip()))
                             df_cb.loc[idx, 'TrangThai'] = False
                             df_cb.to_excel(path_canbo, index=False)
-                            
                             st.session_state.force_change_pass = False
-                            st.success("🎉 Đổi mật khẩu thành công! Đang chuyển vào hệ thống...")
+                            st.success("🎉 Đổi mật khẩu thành công!")
                             st.rerun()
-                        else:
-                            st.error(f"❌ Không tìm thấy dòng dữ liệu của Mã NV '{target_ma}' trong file Thamso_canbo.xlsx.")
                     except Exception as e:
                         st.error(f"❌ Lỗi cập nhật mật khẩu: {e}")
         return False
 
     return True
 
-# --- THỰC THI KIỂM TRA ĐĂNG NHẬP TRƯỚC KHI HIỂN THỊ HỆ THỐNG ---
 if not check_login_system(BASE_DIR):
     st.stop()
 
-# Cấu hình giao diện chính
-st.set_page_config(
-    page_title="Hệ Thống Báo Cáo Trung Tâm Tiếp Quỹ & NHNN",
-    page_icon="📊",
-    layout="wide"
-)
+st.set_page_config(page_title="Hệ Thống Báo Cáo Trung Tâm Tiếp Quỹ & NHNN", page_icon="📊", layout="wide")
 
 st.markdown("""
     <style>
@@ -209,8 +188,6 @@ st.markdown("""
         border-radius: 14px;
         box-shadow: 0 4px 15px rgba(210, 180, 195, 0.12);
     }
-    div[data-testid="stMetric"] label { color: #7D6B75 !important; font-weight: 500; }
-    h3, h4 { color: #4A3B45; font-family: 'Helvetica Neue', sans-serif; }
     .stButton > button {
         border-radius: 10px;
         border: none;
@@ -232,14 +209,8 @@ st.markdown("---")
 today = date.today()
 default_kc_start = date(today.year, today.month, 1)
 default_kc_end = today
-
-if today.month == 1:
-    prev_month_year = today.year - 1
-    prev_month = 12
-else:
-    prev_month_year = today.year
-    prev_month = today.month - 1
-
+prev_month_year = today.year - 1 if today.month == 1 else today.year
+prev_month = 12 if today.month == 1 else today.month - 1
 last_day_of_prev_month = calendar.monthrange(prev_month_year, prev_month)[1]
 default_kp_start = date(prev_month_year, prev_month, 1)
 default_kp_end = date(prev_month_year, prev_month, last_day_of_prev_month)
@@ -277,73 +248,38 @@ end_prev = st.sidebar.date_input("Đến ngày (Kỳ trước)", value=default_k
 start_curr = st.sidebar.date_input("Từ ngày (Kỳ này)", value=default_kc_start)
 end_curr = st.sidebar.date_input("Đến ngày (Kỳ này)", value=default_kc_end)
 
-# ==================== HÀM RENDER DASHBOARD SLA ====================
-def render_sla_violation_dashboard(df_master, shared_data_dir, param_dir, start_date, end_date):
-    st.markdown("---")
-    st.subheader("🌸 DASHBOARD TRỰC QUAN & GIÁM SÁT VI PHẠM SLA")
-
-    @st.cache_data
-    def load_mock_or_real_sla_data(df_m):
-        if df_m.empty: return pd.DataFrame()
-        np.random.seed(42)
-        nghiep_vu_list = ['Tiếp quỹ định lượng', 'Tiếp quỹ ATM', 'Nộp lĩnh khác', 'Kiểm đếm tiền', 'Xử lý tiền mặt']
-        mock_records = []
-        for _, row in df_m.iterrows():
-            num_tx = np.random.randint(5, 25)
-            for _ in range(num_tx):
-                nv = np.random.choice(nghiep_vu_list)
-                is_violation = np.random.choice([0, 1], p=[0.93, 0.07])
-                mock_records.append({
-                    'MaSo': row.get('MaSo', 'N/A'),
-                    'HoTen': row.get('HoTen', 'Nhân sự'),
-                    'CoSo': row.get('CoSo', 'Cơ sở 1'),
-                    'ViTri': row.get('ViTri', 'Nhân viên'),
-                    'LoaiNghiepVu': nv,
-                    'ViPham': is_violation 
-                })
-        return pd.DataFrame(mock_records)
-
-    df_sla = load_mock_or_real_sla_data(df_master)
-    if df_sla.empty: return
-
-    col_f1, col_f2 = st.columns(2)
-    with col_f1: selected_coso_sla = st.selectbox("🔍 Lọc theo Cơ sở:", ["Tất cả"] + list(df_sla['CoSo'].unique()), key="sla_filter_coso")
-    with col_f2: selected_nv_sla = st.selectbox("🔍 Lọc theo Nghiệp vụ:", ["Tất cả"] + list(df_sla['LoaiNghiepVu'].unique()), key="sla_filter_nv")
-
-    df_filtered = df_sla.copy()
-    if selected_coso_sla != "Tất cả": df_filtered = df_filtered[df_filtered['CoSo'] == selected_coso_sla]
-    if selected_nv_sla != "Tất cả": df_filtered = df_filtered[df_filtered['LoaiNghiepVu'] == selected_nv_sla]
-
-    total_tx = len(df_filtered)
-    total_violation = df_filtered['ViPham'].sum()
-    rate_violation = (total_violation / total_tx * 100) if total_tx > 0 else 0.0
-
-    mcol1, mcol2, mcol3 = st.columns(3)
-    mcol1.metric("📌 Tổng số Giao dịch giám sát", f"{total_tx:,}")
-    mcol2.metric("⚠️ Tổng số vụ Vi phạm SLA", f"{total_violation:,}", delta=f"-{rate_violation:.2f}%", delta_color="inverse")
-    mcol3.metric("📈 Tỷ lệ vi phạm chung", f"{rate_violation:.2f}%")
-
-
-# ==================== ĐIỀU HƯỚNG HIỂN THỊ CÁC MODULE ====================
-
+# ==================== XỬ LÝ MODULE BÁO CÁO TỔNG HỢP ====================
 if report_type == "Báo Cáo Tổng Hợp (Tiếp Quỹ & Thu Gom)":
     st.subheader("📋 MODULE BÁO CÁO TỔNG HỢP TIẾP QUỸ & THU GOM")
+    
+    st.markdown(f"""
+    <div style="background-color: #F5EFF2; padding: 12px 18px; border-radius: 10px; border: 1px solid #EEDCE3; margin-bottom: 20px;">
+        <h4 style="margin: 0 0 8px 0; color: #4A3B45;">📅 KỲ BÁO CÁO ĐỐI CHÍNH</h4>
+        • <b>Kỳ trước:</b> Từ ngày {start_prev.strftime('%d/%m/%Y')} đến {end_prev.strftime('%d/%m/%Y')}<br>
+        • <b>Kỳ báo cáo:</b> Từ ngày {start_curr.strftime('%d/%m/%Y')} đến {end_curr.strftime('%d/%m/%Y')}
+    </div>
+    """, unsafe_allow_html=True)
+
     PATH_FILE1 = os.path.join(SHARED_DATA_DIR, "Ds_TiepQuyThuGom.xlsx")
     PATH_FILE2 = os.path.join(SHARED_DATA_DIR, "Ds_Noplinhkhac.xlsx")
     PATH_PARAM_KM = os.path.join(BASE_DIR, "parameters", "Thamso_KM.xlsx")
     PATH_TEMPLATE = os.path.join(BASE_DIR, "templates", "Template_BaoCao1.xlsx")
 
+    st.info("ℹ️ **Lưu ý:** Quá trình xử lý dữ liệu lớn có thể mất từ vài giây đến vài phút. Hệ thống sẽ tự động thông báo tiến trình.")
+
     if st.button("⚡ Chạy và Xem Báo Cáo Tổng Hợp", type="primary"):
         if bc is None:
             st.error("❌ Không tìm thấy module `BC_th.py`.")
         else:
-            with st.spinner("Đang xử lý báo cáo tổng hợp..."):
-                if os.path.exists(PATH_FILE1) or os.path.exists(PATH_FILE2):
+            with st.status("⏳ Đang xử lý dữ liệu hệ thống...", expanded=True) as status:
+                try:
+                    st.write("📂 Đang đọc và làm sạch dữ liệu nguồn...")
                     df1 = bc.clean_and_prepare_file1(PATH_FILE1) if os.path.exists(PATH_FILE1) else pd.DataFrame()
                     df2 = bc.clean_and_prepare_file2(PATH_FILE2) if os.path.exists(PATH_FILE2) else pd.DataFrame()
                     df_all = pd.concat([df1, df2], ignore_index=True)
                     df_param_km = pd.read_excel(PATH_PARAM_KM) if os.path.exists(PATH_PARAM_KM) else pd.DataFrame()
                     
+                    st.write("⚙️ Đang tiến hành tổng hợp số liệu...")
                     all_coso = ["Cơ sở 1", "Cơ sở 2", "Hub NVC", "CS HĐ", "CS HP", "Toàn trung tâm"]
                     all_nghiep_vu = [nv for nv in df_all['LoaiNghiepVu'].dropna().unique() if nv != 'Bỏ qua'] + ['Tổng Thu', 'Tổng Chi']
                     
@@ -351,17 +287,68 @@ if report_type == "Báo Cáo Tổng Hợp (Tiếp Quỹ & Thu Gom)":
                     df_curr_res = bc.aggregate_period(df_all, start_curr, end_curr, df_param_km)
                     final_table = bc.format_summary_dataframe(df_prev_res, df_curr_res, all_nghiep_vu, all_coso)
                     
-                    st.dataframe(final_table, use_container_width=True)
+                    st.write("💾 Đang định dạng và xuất file Excel thông minh...")
+                    thang_nam_str = start_curr.strftime("%m%Y")
+                    ten_file_excel = f"BC_{thang_nam_str}.xlsx"
+                    path_output_excel = os.path.join(OUTPUT_DIR, ten_file_excel)
+                    
+                    if hasattr(bc, "write_to_template"):
+                        try:
+                            bc.write_to_template(final_table, PATH_TEMPLATE, path_output_excel, start_prev, end_prev, start_curr, end_curr)
+                        except TypeError:
+                            bc.write_to_template(final_table, PATH_TEMPLATE, path_output_excel)
+                    
+                    st.write("📝 Đang lập báo cáo phân tích và đánh giá dạng Word (.docx)...")
+                    path_output_word = None
+                    ten_file_word = f"Danh_Gia_Hoat_Dong_{thang_nam_str}.docx"
+                    if bc_word:
+                        path_output_word = os.path.join(OUTPUT_DIR, ten_file_word)
+                        bc_word.tao_bao_cao_word_danh_gia(final_table, start_prev, end_prev, start_curr, end_curr, path_output_word)
+
+                    status.update(label="🎉 Hoàn thành xử lý toàn bộ báo cáo!", state="complete", expanded=False)
+                except Exception as e:
+                    status.update(label="❌ Xảy ra lỗi trong quá trình xử lý!", state="error", expanded=True)
+                    st.error(f"Chi tiết lỗi: {e}")
+                    st.stop()
+
+            st.markdown("---")
+            st.subheader("📋 Bảng Tổng Hợp Kết Quả Tiếp Quỹ & Thu Gom")
+            st.dataframe(final_table, use_container_width=True)
+            
+            st.markdown("---")
+            st.subheader("📥 KẾT QUẢ XUẤT FILE BÁO CÁO")
+            
+            # Chia làm 2 cột song song để đặt 2 nút tải độc lập, không bị thoát app
+            c_dl1, c_dl2 = st.columns(2)
+            
+            with c_dl1:
+                if os.path.exists(path_output_excel):
+                    with open(path_output_excel, "rb") as f_excel:
+                        st.download_button(
+                            label=f"📥 TẢI BÁO CÁO EXCEL ({ten_file_excel})",
+                            data=f_excel,
+                            file_name=ten_file_excel,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
+                        )
+                        
+            with c_dl2:
+                if path_output_word and os.path.exists(path_output_word):
+                    with open(path_output_word, "rb") as f_word:
+                        st.download_button(
+                            label=f"📥 TẢI BÁO CÁO WORD ({ten_file_word})",
+                            data=f_word,
+                            file_name=ten_file_word,
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True
+                        )
 
 elif report_type == "Báo Cáo Nộp Lĩnh NHNN (Ds_NopLinhNHNN)":
     st.subheader("🏦 MODULE: DANH SÁCH NỘP LĨNH NHNN")
     thang_nam_nhnn = start_curr.strftime("%m%Y")
     path_output_nhnn = os.path.join(OUTPUT_DIR, f"Bao_Cao_DS_NopLinh_NHNN_{thang_nam_nhnn}.xlsx")
-    
     if st.button("🚀 Chạy và Xem Báo Cáo NHNN", type="primary"):
-        if BC_NHNN is None:
-            st.error("❌ Không tìm thấy module `BC_NHNN.py`.")
-        else:
+        if BC_NHNN:
             success = BC_NHNN.process_ds_nop_linh_nhnn_pipeline(SHARED_DATA_DIR, start_curr, end_curr, start_prev, end_prev, path_output_nhnn)
             if success and os.path.exists(path_output_nhnn):
                 st.success("🎉 Xử lý báo cáo NHNN thành công!")
@@ -372,11 +359,8 @@ elif report_type == "Báo Cáo Hoạt Động ATM (BC_atm)":
     PATH_NHATKY = os.path.join(SHARED_DATA_DIR, "BC_nhatkygiaodich.xlsx")
     PATH_PARAM_ATM = os.path.join(BASE_DIR, "parameters", "Thamso_atm.xlsx")
     path_output_atm = os.path.join(OUTPUT_DIR, f"BC_atm_{start_curr.strftime('%m%Y')}.xlsx")
-    
     if st.button("🚀 Chạy và Xuất Báo Cáo ATM", type="primary"):
-        if BC_ATM is None:
-            st.error("❌ Không tìm thấy module `BC_ATM.py`.")
-        else:
+        if BC_ATM:
             df_res = BC_ATM.process_atm_summary_report(PATH_NHATKY, PATH_PARAM_ATM, start_curr, end_curr, start_prev, end_prev, path_output_atm)
             if df_res is not None: st.dataframe(df_res, use_container_width=True)
 
@@ -410,8 +394,6 @@ elif report_type == "Báo Cáo SLA Kho Quỹ":
 elif report_type == "Báo Cáo KPI Cán Bộ":
     if kpi_module and hasattr(kpi_module, "show_kpi_report_page"):
         kpi_module.show_kpi_report_page()
-        if "df_master_result" in st.session_state and st.session_state.df_master_result is not None:
-            render_sla_violation_dashboard(st.session_state.df_master_result, SHARED_DATA_DIR, os.path.join(BASE_DIR, "parameters"), start_curr, end_curr)
 
 st.markdown("---")
 st.markdown("<p style='text-align: center; color: gray;'>Hệ thống báo cáo nội bộ tự động hóa • Tích hợp hiển thị Web & Tải file</p>", unsafe_allow_html=True)
